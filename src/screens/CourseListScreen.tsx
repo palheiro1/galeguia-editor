@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useFocusEffect } from '@react-navigation/native'; // Import useFocusEffect
 
 // Define the Course type based on our database schema
 type Course = {
@@ -26,85 +27,118 @@ export default function CourseListScreen({ navigation }: any) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const { profile } = useAuth();
-  
+
   // Fetch courses based on user role
   const fetchCourses = async () => {
+    // Guard: Don't fetch if profile hasn't loaded yet
+    if (!profile) {
+      console.log("fetchCourses skipped: profile not loaded yet.");
+      return;
+    }
+
     try {
       setLoading(true);
-      
+      console.log(`Fetching courses for role: ${profile.role}`);
+
       // Query depends on user role (admin sees all, creator sees own)
       let query = supabase.from('courses').select('*');
-      
+
       // If not admin, only show user's own courses
-      if (profile?.role !== 'admin') {
-        // We need to get the user's ID
+      if (profile.role !== 'admin') {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          console.log(`Fetching courses for creator_id: ${user.id}`);
           query = query.eq('creator_id', user.id);
+        } else {
+          console.warn("Profile exists but user is null, cannot fetch creator courses.");
+          setCourses([]);
+          setLoading(false);
+          return;
         }
+      } else {
+        console.log("Fetching all courses as admin.");
       }
-      
+
       // Sort by created date, newest first
       const { data, error } = await query.order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+        throw error;
+      }
+
       if (data) {
+        console.log(`Fetched ${data.length} courses.`);
         setCourses(data as Course[]);
+      } else {
+        console.log("No courses found for the current filter.");
+        setCourses([]);
       }
     } catch (error) {
       console.error('Error fetching courses:', error);
-      Alert.alert('Error', 'Failed to load courses');
+      Alert.alert('Error', `Failed to load courses: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setCourses([]);
     } finally {
       setLoading(false);
     }
   };
-  
+
+  // Use useFocusEffect to refresh the list when navigating back
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log("CourseListScreen focused, fetching courses...");
+      fetchCourses();
+    }, [profile]) // Add profile to dependency array
+  );
+
   // Delete a course
   const deleteCourse = async (id: string) => {
-    try {
-      Alert.alert(
-        'Confirm Delete',
-        'Are you sure you want to delete this course? This cannot be undone.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
+    console.log(`Delete button pressed for course ID: ${id}`);
+
+    Alert.alert(
+      'Confirm Delete',
+      'Are you sure you want to delete this course? This will also delete all associated modules and lessons and cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          // *** TEMPORARILY SIMPLIFY onPress ***
+          onPress: () => {
+            console.log(`Alert's "Delete" button clicked for course ID: ${id}. Supabase call commented out.`);
+            // Temporarily comment out the actual deletion logic
+            /*
+            try {
               setLoading(true);
               const { error } = await supabase.from('courses').delete().eq('id', id);
-              
-              if (error) throw error;
-              
-              // Refresh the course list
-              await fetchCourses();
+
+              if (error) {
+                console.error('Supabase delete error:', error);
+                throw error;
+              }
+
               Alert.alert('Success', 'Course deleted successfully');
+            } catch (error) {
+              console.error('Error during course deletion process:', error);
+              Alert.alert(
+                'Error',
+                `Failed to delete course: ${error instanceof Error ? error.message : 'Unknown error'}. Check console and RLS policies.`
+              );
+            } finally {
+              setLoading(false);
             }
+            */
           }
-        ]
-      );
-    } catch (error) {
-      console.error('Error deleting course:', error);
-      Alert.alert('Error', 'Failed to delete course');
-      setLoading(false);
-    }
+        }
+      ]
+    );
   };
-  
-  // Load courses on component mount
-  useEffect(() => {
-    fetchCourses();
-    
-    // You could add a focus listener here to refresh courses when the screen is focused
-    // This would be useful when coming back from the edit screen
-  }, []);
-  
+
   // Create a new course
   const createNewCourse = () => {
-    // Navigate to course edit screen with no ID to indicate creating a new course
     navigation.navigate('CourseEdit', { courseId: null });
   };
-  
+
   // Edit an existing course
   const editCourse = (courseId: string) => {
     navigation.navigate('CourseEdit', { courseId });
@@ -118,25 +152,24 @@ export default function CourseListScreen({ navigation }: any) {
         <Text style={styles.courseDescription} numberOfLines={2}>
           {item.description || 'No description'}
         </Text>
-        
-        {/* Show published status (especially useful for admins) */}
+
         <View style={styles.statusContainer}>
           <Text style={item.published ? styles.publishedBadge : styles.draftBadge}>
             {item.published ? 'Published' : 'Draft'}
           </Text>
         </View>
       </View>
-      
+
       <View style={styles.courseActions}>
-        <TouchableOpacity 
-          style={[styles.button, styles.editButton]} 
+        <TouchableOpacity
+          style={[styles.button, styles.editButton]}
           onPress={() => editCourse(item.id)}
         >
           <Text style={styles.buttonText}>Edit</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.button, styles.deleteButton]} 
+
+        <TouchableOpacity
+          style={[styles.button, styles.deleteButton]}
           onPress={() => deleteCourse(item.id)}
         >
           <Text style={styles.buttonText}>Delete</Text>
@@ -149,8 +182,8 @@ export default function CourseListScreen({ navigation }: any) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Courses</Text>
-        <TouchableOpacity 
-          style={styles.createButton} 
+        <TouchableOpacity
+          style={styles.createButton}
           onPress={createNewCourse}
         >
           <Text style={styles.createButtonText}>+ Create Course</Text>
@@ -164,7 +197,7 @@ export default function CourseListScreen({ navigation }: any) {
       ) : courses.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
-            You don't have any courses yet. Click "Create Course" to get started.
+            {profile ? "You don't have any courses yet. Click \"Create Course\" to get started." : "Loading profile..."}
           </Text>
         </View>
       ) : (
@@ -173,6 +206,7 @@ export default function CourseListScreen({ navigation }: any) {
           renderItem={renderCourseItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
+          extraData={loading || courses.length}
         />
       )}
     </View>
@@ -231,7 +265,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     padding: 16,
-    // Replace shadow* with boxShadow for web
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -243,7 +276,7 @@ const styles = StyleSheet.create({
         elevation: 2,
       },
       web: {
-        boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)', // Example boxShadow
+        boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
       }
     }),
   },
