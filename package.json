@@ -11,7 +11,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web --clear",
     "build:web": "expo export --platform web --clear",
-    "predeploy": "expo export --platform web --clear",
+    "predeploy": "npm run build:web",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
@@ -42,5 +42,6 @@
     "gh-pages": "^6.3.0",
     "typescript": "^5.3.3"
   },
-  "private": true
+  "private": true,
+  "homepage": "https://palheiro1.github.io/Galeguia1/"
 }
