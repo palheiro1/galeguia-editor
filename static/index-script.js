@@ -1,13 +1,31 @@
 // Single Page Apps for GitHub Pages
 // MIT License
-// https://github.com/rafgraph/spa-github-pages
-(function(l) {
-  if (l.search[1] === '/' ) {
-    var decoded = l.search.slice(1).split('&').map(function(s) { 
-      return s.replace(/~and~/g, '&')
-    }).join('?');
-    window.history.replaceState(null, null,
-      l.pathname.slice(0, -1) + decoded + l.hash
-    );
+// Modified version based on https://github.com/rafgraph/spa-github-pages
+(function() {
+  // Check if we've been redirected from the 404 page
+  if (sessionStorage.getItem('redirect') === 'true') {
+    sessionStorage.removeItem('redirect');
+    var redirectPath = sessionStorage.getItem('redirectPath');
+    sessionStorage.removeItem('redirectPath');
+    if (redirectPath) {
+      history.replaceState(null, null, '/' + redirectPath);
+    }
   }
-}(window.location))
+
+  // Handle redirect from 404 page with query parameters
+  var location = window.location;
+  if (location.search) {
+    var params = {};
+    location.search.slice(1).split('&').forEach(function(param) {
+      var parts = param.split('=');
+      params[parts[0]] = parts[1];
+    });
+    
+    if (params.p) {
+      var route = params.p;
+      var query = params.q ? ('?' + params.q) : '';
+      var hash = location.hash;
+      history.replaceState(null, null, route + query + hash);
+    }
+  }
+})();
