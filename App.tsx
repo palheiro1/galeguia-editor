@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, Text, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import CourseListScreen from './src/screens/CourseListScreen';
 import CourseEditScreen from './src/screens/CourseEditScreen';
 import ModuleEditScreen from './src/screens/ModuleEditScreen';
 import LessonEditScreen from './src/screens/LessonEditScreen';
+import { supabase } from './src/lib/supabase';
 
 // Define the stack navigator types
 type RootStackParamList = {
@@ -19,6 +20,51 @@ type RootStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Component to handle auth redirects from email confirmations
+function AuthRedirect({ children }: { children: React.ReactNode }) {
+  const [authChecked, setAuthChecked] = useState(false);
+  
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      // Skip this logic for native platforms
+      setAuthChecked(true);
+      return;
+    }
+
+    // For Netlify and other web hosts, detect auth in URL
+    const handleAuthFromUrl = async () => {
+      try {
+        // This will parse the URL for auth info, if present
+        await supabase.auth.getSession();
+        
+        // Remove any hash fragments that may contain auth tokens
+        if (window.location.hash && window.location.hash.includes('access_token')) {
+          // Create clean URL without the hash fragments
+          const cleanUrl = window.location.href.split('#')[0];
+          window.history.replaceState(null, '', cleanUrl);
+        }
+      } catch (error) {
+        console.error("Error handling auth from URL:", error);
+      }
+      
+      setAuthChecked(true);
+    };
+    
+    handleAuthFromUrl();
+  }, []);
+  
+  if (!authChecked && Platform.OS === 'web') {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#4285F4" />
+        <Text style={styles.loadingText}>Processing authentication...</Text>
+      </View>
+    );
+  }
+  
+  return <>{children}</>;
+}
 
 // Main content component that shows different screens based on auth state
 function MainContent() {
@@ -91,12 +137,14 @@ function MainContent() {
   );
 }
 
-// Main App component with AuthProvider wrapper
+// Main App component with AuthProvider wrapper and AuthRedirect
 export default function App() {
   return (
-    <AuthProvider>
-      <MainContent />
-    </AuthProvider>
+    <AuthRedirect>
+      <AuthProvider>
+        <MainContent />
+      </AuthProvider>
+    </AuthRedirect>
   );
 }
 

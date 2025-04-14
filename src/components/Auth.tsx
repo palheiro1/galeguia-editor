@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { Alert, StyleSheet, View, Text, TextInput, TouchableOpacity, Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 
 export default function Auth() {
@@ -7,28 +7,83 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Get the current URL for redirects (web platform only)
+  const getURL = () => {
+    if (Platform.OS !== 'web') return undefined;
+    const url = window.location.href;
+    const baseUrl = url.split('#')[0]; // Remove any hash/fragment
+    return baseUrl;
+  };
 
   async function signInWithEmail() {
     setLoading(true);
+    setErrorMsg(null);
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) Alert.alert('Error', error.message);
+    if (error) {
+      setErrorMsg(error.message);
+      Alert.alert('Error', error.message);
+    }
     setLoading(false);
   }
 
   async function signUpWithEmail() {
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    if (!email || !password) {
+      setErrorMsg('Please provide both email and password');
+      Alert.alert('Error', 'Please provide both email and password');
+      return;
+    }
+    
+    if (password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters');
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
 
-    if (error) Alert.alert('Error', error.message);
-    else Alert.alert('Success', 'Check your email for the confirmation link!');
-    setLoading(false);
+    setLoading(true);
+    setErrorMsg(null);
+    
+    // Include redirect URLs for web platform
+    const options = Platform.OS === 'web' 
+      ? {
+          emailRedirectTo: getURL(),
+          data: { 
+            role: 'creator' // Default role for new users
+          }
+        } 
+      : {};
+    
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: options
+      });
+
+      if (error) {
+        setErrorMsg(error.message);
+        Alert.alert('Error', error.message);
+      } else if (data?.user) {
+        Alert.alert(
+          'Success', 
+          'Account created successfully! Please check your email for confirmation.'
+        );
+        // Switch to login view after successful signup
+        setIsLogin(true);
+      }
+    } catch (err) {
+      console.error('Signup error:', err);
+      setErrorMsg('An unexpected error occurred');
+      Alert.alert('Error', 'An unexpected error occurred during signup');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -38,11 +93,16 @@ export default function Auth() {
           {isLogin ? 'Sign In to Galeguia Editor' : 'Create an Account'}
         </Text>
         
+        {errorMsg ? (
+          <Text style={styles.errorText}>{errorMsg}</Text>
+        ) : null}
+        
         <TextInput
           style={styles.input}
           placeholder="Email"
           value={email}
           autoCapitalize="none"
+          keyboardType="email-address"
           onChangeText={(text) => setEmail(text)}
         />
         
@@ -56,18 +116,22 @@ export default function Auth() {
         />
 
         <TouchableOpacity 
-          style={[styles.button, styles.buttonPrimary]}
+          style={[styles.button, styles.buttonPrimary, loading && styles.buttonDisabled]}
           onPress={() => isLogin ? signInWithEmail() : signUpWithEmail()}
           disabled={loading}
         >
           <Text style={styles.buttonText}>
-            {isLogin ? 'Sign In' : 'Sign Up'}
+            {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Sign Up'}
           </Text>
         </TouchableOpacity>
         
         <TouchableOpacity
           style={styles.switchButton}
-          onPress={() => setIsLogin(!isLogin)}
+          onPress={() => {
+            setIsLogin(!isLogin);
+            setErrorMsg(null);
+          }}
+          disabled={loading}
         >
           <Text style={styles.switchText}>
             {isLogin ? 'Need an account? Sign Up' : 'Already have an account? Sign In'}
@@ -120,6 +184,9 @@ const styles = StyleSheet.create({
   buttonPrimary: {
     backgroundColor: '#4285F4',
   },
+  buttonDisabled: {
+    backgroundColor: '#a0c4ff',
+  },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
@@ -130,5 +197,11 @@ const styles = StyleSheet.create({
   },
   switchText: {
     color: '#4285F4',
+  },
+  errorText: {
+    color: '#ea4335',
+    textAlign: 'center',
+    marginBottom: 15,
+    fontSize: 14,
   },
 });
