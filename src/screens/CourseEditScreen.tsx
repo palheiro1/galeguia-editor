@@ -10,8 +10,10 @@ import {
   Alert,
   Image,
   FlatList,
+  Platform, // Import Platform
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { MediaTypeOptions } from 'expo-image-picker'; // Import MediaTypeOptions explicitly
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -33,13 +35,14 @@ type Module = {
   id: string;
   course_id: string;
   title: string;
-  order: number;
+  position: number; // Changed from order to position
 };
 
 export default function CourseEditScreen({ route, navigation }: any) {
   const { courseId, refresh } = route.params;
   const isNewCourse = courseId === null;
-  const { profile } = useAuth();
+  const { profile, session } = useAuth(); // Get session for user ID
+  const userId = session?.user?.id; // Extract user ID
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -97,74 +100,111 @@ export default function CourseEditScreen({ route, navigation }: any) {
   // Fetch modules for this course
   const fetchModules = async () => {
     try {
+      // Use 'position' as the column name for ordering
       const { data, error } = await supabase
         .from('modules')
-        .select('id, course_id, title, order')
+        .select('id, course_id, title, position') // Select position
         .eq('course_id', courseId)
-        .order('order', { ascending: true });
+        .order('position', { ascending: true }); // Order by position
       
-      if (error) throw error;
+      if (error) {
+        // Log the specific Supabase error
+        console.error('Supabase error fetching modules:', error); 
+        throw error;
+      }
       
       if (data) {
         setModules(data);
       }
     } catch (error) {
-      console.error('Error fetching modules:', error);
-      Alert.alert('Error', 'Failed to load modules');
+      // Log the caught error object
+      console.error('Error fetching modules:', error); 
+      Alert.alert('Error', `Failed to load modules: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
   
   // Image picker function
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: [ImagePicker.MediaType.IMAGE],
+      mediaTypes: MediaTypeOptions.Images, // Use the enum MediaTypeOptions.Images
       allowsEditing: true,
       aspect: [16, 9],
       quality: 0.8,
+      base64: Platform.OS === 'web', 
     });
     
     if (!result.canceled) {
       try {
-        const imageUri = result.assets[0].uri;
-        const uploadedUrl = await uploadImage(imageUri);
+        const asset = result.assets[0];
+        const imageUri = asset.uri;
+        const uploadedUrl = await uploadImage(imageUri, userId); 
         if (uploadedUrl) {
+          console.log('Image uploaded successfully. URL:', uploadedUrl); // Log URL on success
           setCoverImageUrl(uploadedUrl);
+        } else {
+          console.log('Image upload failed, URL is null.'); // Log if upload failed
         }
       } catch (error) {
-        console.error('Error uploading image:', error);
-        Alert.alert('Error', 'Failed to upload image');
+        console.error('Error processing picked image:', error);
+        Alert.alert('Error', 'Failed to process selected image');
       }
     }
   };
   
   // Upload image to Supabase storage
-  const uploadImage = async (uri: string) => {
+  const uploadImage = async (uri: string, userId?: string) => { // Add optional userId parameter
+    if (!userId) {
+      console.error('Upload attempted without user ID');
+      Alert.alert('Error', 'Authentication error, cannot upload file.');
+      return null;
+    }
     try {
-      // Get file extension
-      const fileExt = uri.split('.').pop() || 'jpg';
-      const fileName = `course_cover_${Date.now()}.${fileExt}`;
-      const filePath = `course-content/${fileName}`;
-
-      // Convert URI to blob
+      // Fetch the image data from the URI
       const response = await fetch(uri);
       const blob = await response.blob();
+      
+      // Determine file extension from blob type or URI - slightly improved logic
+      let fileExt = blob.type?.split('/')[1];
+      if (!fileExt && uri) {
+        const uriParts = uri.split('.');
+        fileExt = uriParts.length > 1 ? uriParts.pop()?.toLowerCase() : undefined;
+      }
+      fileExt = fileExt || 'jpg'; // Default to jpg if still undetermined
 
-      // Upload to Supabase Storage (use 'course-content' bucket for cover images)
-      // Ensure CORS and storage policies allow uploads from your frontend
-      const { error } = await supabase.storage
+      const fileName = `course_cover_${Date.now()}.${fileExt}`;
+      // Define the path within the bucket (e.g., user-specific folder)
+      const filePath = `${fileName}`; 
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('course-content') // Bucket name
+        .upload(filePath, blob, {
+          contentType: blob.type, // Pass content type
+          upsert: false, // Don't overwrite existing files with the same name
+        });
+
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL using the correct filePath
+      const { data: urlData } = supabase.storage
         .from('course-content')
-        .upload(fileName, blob);
+        .getPublicUrl(filePath);
 
-      if (error) throw error;
-
-      // Get public URL
-      const { data } = supabase.storage
-        .from('course-content')
-        .getPublicUrl(fileName);
-
-      return data?.publicUrl || null;
+      return urlData?.publicUrl || null;
+      
     } catch (error) {
       console.error('Error uploading image:', error);
+      // Provide more specific error feedback if possible
+      if (error instanceof Error && error.message.includes('fetch')) {
+        Alert.alert('Upload Error', 'Network error during image upload. Please check your connection.');
+      } else if (error instanceof Error && error.message.includes('storage')) {
+         Alert.alert('Upload Error', `Storage error: ${error.message}`);
+      } else {
+         Alert.alert('Upload Error', 'An unexpected error occurred during image upload.');
+      }
       return null;
     }
   };
@@ -179,10 +219,6 @@ export default function CourseEditScreen({ route, navigation }: any) {
     try {
       setIsSaving(true);
       
-      // Get current user ID for creator_id
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-      
       const courseData = {
         title: title.trim(),
         description: description.trim() || null,
@@ -196,7 +232,7 @@ export default function CourseEditScreen({ route, navigation }: any) {
           .from('courses')
           .insert({
             ...courseData,
-            creator_id: user.id,
+            creator_id: userId,
             published: false, // Always start as draft
             created_at: new Date().toISOString(),
           })
@@ -206,7 +242,6 @@ export default function CourseEditScreen({ route, navigation }: any) {
         if (error) throw error;
         
         Alert.alert('Success', 'Course created successfully');
-        // Navigate back to list with the new course ID
         navigation.navigate('CourseList');
       } else {
         // Updating an existing course
@@ -230,7 +265,6 @@ export default function CourseEditScreen({ route, navigation }: any) {
   
   // Toggle publish state (admin only)
   const togglePublish = async () => {
-    // Only admins can publish/unpublish
     if (profile?.role !== 'admin') {
       Alert.alert('Permission Denied', 'Only administrators can publish or unpublish courses');
       return;
@@ -297,7 +331,7 @@ export default function CourseEditScreen({ route, navigation }: any) {
     >
       <View style={styles.moduleInfo}>
         <Text style={styles.moduleTitle}>{item.title}</Text>
-        <Text style={styles.moduleOrder}>Order: {item.order}</Text>
+        <Text style={styles.moduleOrder}>Position: {item.position}</Text> {/* Display position */}
       </View>
     </TouchableOpacity>
   );
@@ -309,6 +343,9 @@ export default function CourseEditScreen({ route, navigation }: any) {
       </View>
     );
   }
+  
+  // Log the coverImageUrl state before rendering
+  console.log('Rendering CourseEditScreen, coverImageUrl:', coverImageUrl); 
   
   return (
     <ScrollView style={styles.container}>
@@ -350,11 +387,11 @@ export default function CourseEditScreen({ route, navigation }: any) {
               source={{ uri: coverImageUrl }}
               style={styles.imagePreview}
               resizeMode="cover"
+              onError={(e) => console.error('Image load error:', e.nativeEvent.error)} // Add error handler for Image
             />
           </View>
         )}
         
-        {/* Status indicator for existing courses */}
         {!isNewCourse && (
           <View style={styles.statusContainer}>
             <Text style={styles.statusLabel}>Status:</Text>
@@ -364,7 +401,6 @@ export default function CourseEditScreen({ route, navigation }: any) {
           </View>
         )}
         
-        {/* Action buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[styles.button, styles.cancelButton]}
@@ -384,7 +420,6 @@ export default function CourseEditScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
         
-        {/* Publish/Unpublish button for admins */}
         {profile?.role === 'admin' && !isNewCourse && (
           <TouchableOpacity
             style={[
@@ -402,7 +437,6 @@ export default function CourseEditScreen({ route, navigation }: any) {
         )}
       </View>
       
-      {/* Modules section - only show for existing courses */}
       {!isNewCourse && (
         <View style={styles.modulesSection}>
           <View style={styles.sectionHeader}>
@@ -427,7 +461,7 @@ export default function CourseEditScreen({ route, navigation }: any) {
               renderItem={renderModuleItem}
               keyExtractor={item => item.id}
               contentContainerStyle={styles.moduleList}
-              scrollEnabled={false} // disable scrolling inside ScrollView
+              scrollEnabled={false}
             />
           )}
         </View>

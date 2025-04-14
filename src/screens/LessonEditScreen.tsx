@@ -13,6 +13,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext'; // Import useAuth
 
 // Lesson type definition
 type Lesson = {
@@ -29,6 +30,8 @@ type Lesson = {
 
 export default function LessonEditScreen({ route, navigation }: any) {
   const { moduleId, lessonId } = route.params;
+  const { session } = useAuth(); // Get session using the hook
+  const userId = session?.user?.id; // Extract user ID
   const isNewLesson = lessonId === null;
   
   const [title, setTitle] = useState('');
@@ -99,8 +102,12 @@ export default function LessonEditScreen({ route, navigation }: any) {
   
   // Pick an image from the library
   const pickImage = async () => {
+    if (!userId) {
+      Alert.alert('Error', 'User not authenticated.');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: [ImagePicker.MediaType.IMAGE],
+      mediaTypes: ['images'], // Use string literal as suggested by TS error and docs
       allowsEditing: true,
       quality: 0.8,
     });
@@ -108,7 +115,8 @@ export default function LessonEditScreen({ route, navigation }: any) {
     if (!result.canceled) {
       try {
         const imageUri = result.assets[0].uri;
-        const uploadedUrl = await uploadMedia(imageUri, 'image');
+        // Pass userId to uploadMedia
+        const uploadedUrl = await uploadMedia(imageUri, 'image', userId); 
         if (uploadedUrl) {
           setMediaUrl(uploadedUrl);
           setMediaType('image');
@@ -122,6 +130,10 @@ export default function LessonEditScreen({ route, navigation }: any) {
   
   // Pick a document (video, audio)
   const pickDocument = async (type: 'video' | 'audio') => {
+    if (!userId) {
+      Alert.alert('Error', 'User not authenticated.');
+      return;
+    }
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: type === 'video' ? 'video/*' : 'audio/*',
@@ -131,7 +143,8 @@ export default function LessonEditScreen({ route, navigation }: any) {
       if (result.canceled) return;
       
       const uri = result.assets[0].uri;
-      const uploadedUrl = await uploadMedia(uri, type);
+      // Pass userId to uploadMedia
+      const uploadedUrl = await uploadMedia(uri, type, userId); 
       
       if (uploadedUrl) {
         setMediaUrl(uploadedUrl);
@@ -144,12 +157,18 @@ export default function LessonEditScreen({ route, navigation }: any) {
   };
   
   // Upload media to Supabase storage
-  const uploadMedia = async (uri: string, type: 'image' | 'video' | 'audio') => {
+  const uploadMedia = async (uri: string, type: 'image' | 'video' | 'audio', userId: string) => { // Add userId parameter
+    if (!userId) {
+      console.error('Upload attempted without user ID');
+      Alert.alert('Error', 'Authentication error, cannot upload file.');
+      return null;
+    }
     try {
       // Get file extension
       const fileExt = uri.split('.').pop()?.toLowerCase() || '';
       const fileName = `lesson_${type}_${Date.now()}.${fileExt}`;
-      const filePath = `lesson_content/${fileName}`;
+      // Use user-specific path
+      const filePath = `${userId}/lesson_content/${fileName}`; 
       
       // Convert URI to blob
       const response = await fetch(uri);
