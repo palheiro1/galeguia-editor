@@ -117,7 +117,7 @@ export default function CourseEditScreen({ route, navigation }: any) {
   // Image picker function
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: [ImagePicker.MediaType.IMAGE],
       allowsEditing: true,
       aspect: [16, 9],
       quality: 0.8,
