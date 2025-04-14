@@ -21,9 +21,6 @@ jobs:
       - name: Install Dependencies 📦
         run: npm ci
         
-      - name: Install Additional Web Dependencies
-        run: npx expo install react-native-web@~0.19.13 @expo/metro-runtime@~4.0.1
-        
       - name: Build Web App 🏗️
         run: npx expo export --platform web
         env:

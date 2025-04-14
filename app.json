@@ -24,13 +24,9 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "output": "static",
-      "bundler": "metro",
-      "staticPageRouting": false
+      "bundler": "metro"
     },
     "scheme": "galeguia-editor",
-    "homepage": ".",
-    "experiments": {
-      "staticRendering": false
-    }
+    "homepage": "."
   }
 }
