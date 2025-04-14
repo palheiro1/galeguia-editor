@@ -22,9 +22,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro",
-      "output": "single",
-      "publicPath": "/Galeguia1"
+      "bundler": "metro"
     }
   }
 }

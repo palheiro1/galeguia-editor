@@ -5,29 +5,22 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>Galeguia Editor</title>
-    <!-- Security policy that allows necessary resources -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.github.io; script-src 'self' https://*.github.io 'unsafe-inline' 'unsafe-eval'; style-src 'self' https://*.github.io 'unsafe-inline'; img-src 'self' https://*.github.io data: blob:; font-src 'self' https://*.github.io data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.github.io https://*.amazonaws.com https://*.cloudfront.net data:;">
-    <!-- The react-native-web recommended style reset -->
+    <!-- No CSP headers to avoid blocking resources -->
     <style id="expo-reset">
-      /* These styles make the body full-height */
       html, body {
         height: 100%;
+        margin: 0;
+        padding: 0;
       }
-      /* These styles disable body scrolling if using <ScrollView> */
       body {
         overflow: hidden;
       }
-      /* These styles make the root element full-height */
       #root {
         display: flex;
         height: 100%;
         flex: 1;
       }
     </style>
-    <!-- Base path specification for GitHub Pages -->
-    <base href="/Galeguia1/" />
-    <!-- Client-side routing script -->
-    <script type="text/javascript" src="index-script.js"></script>
   </head>
   <body>
     <noscript>
