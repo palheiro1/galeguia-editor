@@ -38,13 +38,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       
-      const { data, error } = await supabase
+      const { data, error, status } = await supabase
         .from('profiles')
         .select('username, role')
         .eq('user_id', user.id)
         .single();
-        
-      if (error) throw error;
+      
+      if (error && status !== 406) {
+        console.error('Error fetching profile:', error);
+        return null;
+      }
       return data as ProfileData;
     } catch (error) {
       console.error('Error getting profile:', error);
@@ -68,10 +71,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }
 
-  // Set up session listener
+  // Set up auth state management
   useEffect(() => {
-    setIsLoading(true);
-
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -83,27 +84,35 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // Set up listener for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        if (session) {
+      async (event, newSession) => {
+        setSession(newSession);
+        
+        // Only refresh profile on specific events
+        if (newSession && ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
           await refreshProfile();
-        } else {
+        } else if (!newSession) {
           setProfile(null);
         }
       }
     );
 
-    // Setup app state change listener to refresh token
-    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        supabase.auth.refreshSession();
+    // Setup app state change listener to manage token refresh
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        supabase.auth.startAutoRefresh();
+      } else {
+        supabase.auth.stopAutoRefresh();
       }
     });
+
+    // Start auto refresh when component mounts
+    supabase.auth.startAutoRefresh();
 
     // Cleanup function
     return () => {
       subscription.unsubscribe();
       appStateSubscription.remove();
+      supabase.auth.stopAutoRefresh();
     };
   }, []);
 

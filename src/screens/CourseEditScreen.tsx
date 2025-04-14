@@ -143,24 +143,25 @@ export default function CourseEditScreen({ route, navigation }: any) {
       // Get file extension
       const fileExt = uri.split('.').pop() || 'jpg';
       const fileName = `course_cover_${Date.now()}.${fileExt}`;
-      const filePath = `course_images/${fileName}`;
-      
+      const filePath = `course-content/${fileName}`;
+
       // Convert URI to blob
       const response = await fetch(uri);
       const blob = await response.blob();
-      
-      // Upload to Supabase Storage
+
+      // Upload to Supabase Storage (use 'course-content' bucket for cover images)
+      // Ensure CORS and storage policies allow uploads from your frontend
       const { error } = await supabase.storage
-        .from('course_content')
-        .upload(filePath, blob);
-      
+        .from('course-content')
+        .upload(fileName, blob);
+
       if (error) throw error;
-      
+
       // Get public URL
       const { data } = supabase.storage
-        .from('course_content')
-        .getPublicUrl(filePath);
-      
+        .from('course-content')
+        .getPublicUrl(fileName);
+
       return data?.publicUrl || null;
     } catch (error) {
       console.error('Error uploading image:', error);

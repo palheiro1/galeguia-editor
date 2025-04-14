@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, View, Text, TextInput, TouchableOpacity, Platform } from 'react-native';
+import { Alert, StyleSheet, View, Text, TextInput, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { AppState } from 'react-native';
+
+// Setup automatic token refresh when app comes to foreground
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') {
+    supabase.auth.startAutoRefresh();
+  } else {
+    supabase.auth.stopAutoRefresh();
+  }
+});
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -21,16 +31,23 @@ export default function Auth() {
     setLoading(true);
     setErrorMsg(null);
     
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      setErrorMsg(error.message);
-      Alert.alert('Error', error.message);
+      if (error) {
+        setErrorMsg(error.message);
+        Alert.alert('Error', error.message);
+      }
+    } catch (err) {
+      console.error('Sign in error:', err);
+      setErrorMsg('An unexpected error occurred');
+      Alert.alert('Error', 'An unexpected error occurred during sign in');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   async function signUpWithEmail() {
@@ -53,9 +70,6 @@ export default function Auth() {
     const options = Platform.OS === 'web' 
       ? {
           emailRedirectTo: getURL(),
-          data: { 
-            role: 'creator' // Default role for new users
-          }
         } 
       : {};
     
@@ -63,7 +77,12 @@ export default function Auth() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: options
+        options: {
+          ...options,
+          data: { 
+            role: 'creator' // Default role for new users
+          }
+        }
       });
 
       if (error) {
@@ -120,9 +139,13 @@ export default function Auth() {
           onPress={() => isLogin ? signInWithEmail() : signUpWithEmail()}
           disabled={loading}
         >
-          <Text style={styles.buttonText}>
-            {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Sign Up'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {isLogin ? 'Sign In' : 'Sign Up'}
+            </Text>
+          )}
         </TouchableOpacity>
         
         <TouchableOpacity
@@ -130,6 +153,8 @@ export default function Auth() {
           onPress={() => {
             setIsLogin(!isLogin);
             setErrorMsg(null);
+            setEmail('');
+            setPassword('');
           }}
           disabled={loading}
         >

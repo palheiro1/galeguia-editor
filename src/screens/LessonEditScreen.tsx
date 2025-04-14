@@ -157,14 +157,14 @@ export default function LessonEditScreen({ route, navigation }: any) {
       
       // Upload to Supabase Storage
       const { error } = await supabase.storage
-        .from('course_content')
+        .from('course-content')
         .upload(filePath, blob);
       
       if (error) throw error;
       
       // Get public URL
       const { data } = supabase.storage
-        .from('course_content')
+        .from('course-content')
         .getPublicUrl(filePath);
       
       return data?.publicUrl || null;

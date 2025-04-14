@@ -6,21 +6,22 @@ import { Platform } from 'react-native';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-// Different configuration for web vs. native
-const authConfig = Platform.OS === 'web' 
+// Use a web-compatible AsyncStorage adapter
+const isWeb = typeof window !== 'undefined' && !!window.localStorage;
+
+const AsyncStorageAdapter = isWeb
   ? {
-      storage: AsyncStorage,
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true, // Enable this for web to detect session from URL
+      getItem: async (key: string) => window.localStorage.getItem(key),
+      setItem: async (key: string, value: string) => window.localStorage.setItem(key, value),
+      removeItem: async (key: string) => window.localStorage.removeItem(key),
     }
-  : {
-      storage: AsyncStorage,
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-    };
+  : AsyncStorage;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: authConfig
+  auth: {
+    storage: AsyncStorageAdapter,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  }
 });
