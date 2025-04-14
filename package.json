@@ -2,13 +2,17 @@
   "name": "galeguia-editor",
   "version": "1.0.0",
   "main": "index.ts",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "start": "expo start --clear",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web --clear",
     "build:web": "expo export --platform web --clear",
-    "deploy": "npm run build:web && gh-pages -d dist"
+    "predeploy": "expo export --platform web --clear",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
