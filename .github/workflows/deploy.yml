@@ -20,9 +20,12 @@ jobs:
           
       - name: Install Dependencies 📦
         run: npm ci
-
+        
+      - name: Install Additional Web Dependencies
+        run: npx expo install react-native-web@~0.19.13 @expo/metro-runtime@~4.0.1
+        
       - name: Build Web App 🏗️
-        run: npx expo export --platform web
+        run: npx expo export --platform web --no-static-template
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
