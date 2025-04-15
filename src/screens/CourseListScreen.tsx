@@ -95,43 +95,54 @@ export default function CourseListScreen({ navigation }: any) {
   const deleteCourse = async (id: string) => {
     console.log(`Delete button pressed for course ID: ${id}`);
 
-    Alert.alert(
-      'Confirm Delete',
-      'Are you sure you want to delete this course? This will also delete all associated modules and lessons and cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          // *** TEMPORARILY SIMPLIFY onPress ***
-          onPress: () => {
-            console.log(`Alert's "Delete" button clicked for course ID: ${id}. Supabase call commented out.`);
-            // Temporarily comment out the actual deletion logic
-            /*
-            try {
-              setLoading(true);
-              const { error } = await supabase.from('courses').delete().eq('id', id);
+    const confirmMessage = 'Are you sure you want to delete this course? This will also delete all associated modules and lessons and cannot be undone.';
 
-              if (error) {
-                console.error('Supabase delete error:', error);
-                throw error;
-              }
+    const performDelete = async () => {
+      console.log(`Confirmed delete for course ID: ${id}`);
+      try {
+        setLoading(true); // Show loading indicator during deletion
+        const { error } = await supabase.from('courses').delete().eq('id', id);
 
-              Alert.alert('Success', 'Course deleted successfully');
-            } catch (error) {
-              console.error('Error during course deletion process:', error);
-              Alert.alert(
-                'Error',
-                `Failed to delete course: ${error instanceof Error ? error.message : 'Unknown error'}. Check console and RLS policies.`
-              );
-            } finally {
-              setLoading(false);
-            }
-            */
-          }
+        if (error) {
+          console.error('Supabase delete error:', error); // Log the specific error
+          throw error; // Re-throw to be caught by the catch block
         }
-      ]
-    );
+
+        Alert.alert('Success', 'Course deleted successfully');
+        // useFocusEffect will handle the refresh
+      } catch (error) {
+        console.error('Error during course deletion process:', error); // Log error in catch
+        Alert.alert(
+          'Error',
+          `Failed to delete course: ${error instanceof Error ? error.message : 'Unknown error'}. Check console and RLS policies.`
+        );
+      } finally {
+        // setLoading(false); // Let useFocusEffect's fetchCourses handle this
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      // Use window.confirm for web
+      if (window.confirm(confirmMessage)) {
+        await performDelete();
+      } else {
+        console.log(`Delete cancelled for course ID: ${id}`);
+      }
+    } else {
+      // Use Alert.alert for native platforms
+      Alert.alert(
+        'Confirm Delete',
+        confirmMessage,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => console.log(`Delete cancelled for course ID: ${id}`) },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: performDelete // Call the async function
+          }
+        ]
+      );
+    }
   };
 
   // Create a new course

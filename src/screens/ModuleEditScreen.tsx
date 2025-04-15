@@ -16,7 +16,7 @@ type Module = {
   id: string;
   course_id: string;
   title: string;
-  order: number;
+  position: number;
   created_at: string;
   updated_at: string;
 };
@@ -26,41 +26,43 @@ type Lesson = {
   id: string;
   module_id: string;
   title: string;
-  order: number;
+  position: number; // Changed from 'order' to 'position'
 };
 
 export default function ModuleEditScreen({ route, navigation }: any) {
   const { courseId, moduleId } = route.params;
   const isNewModule = moduleId === null;
-  
+
   const [title, setTitle] = useState('');
-  const [order, setOrder] = useState(0);
+  const [position, setPosition] = useState(0);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Get module data if editing an existing module
   useEffect(() => {
     if (!isNewModule) {
       fetchModuleData();
       fetchLessons();
+    } else {
+      getNextPositionNumber();
     }
   }, [moduleId]);
-  
+
   const fetchModuleData = async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('modules')
-        .select('*')
+        .select('title, position')
         .eq('id', moduleId)
         .single();
-      
+
       if (error) throw error;
-      
+
       if (data) {
         setTitle(data.title);
-        setOrder(data.order);
+        setPosition(data.position);
       }
     } catch (error) {
       console.error('Error fetching module:', error);
@@ -69,44 +71,63 @@ export default function ModuleEditScreen({ route, navigation }: any) {
       setIsLoading(false);
     }
   };
-  
+
+  const getNextPositionNumber = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('modules')
+        .select('position')
+        .eq('course_id', courseId)
+        .order('position', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      const nextPosition = data && data.length > 0 ? data[0].position + 1 : 1;
+      setPosition(nextPosition);
+    } catch (error) {
+      console.error('Error getting next position number:', error);
+      setPosition(1);
+    }
+  };
+
   const fetchLessons = async () => {
+    if (!moduleId) return;
     try {
       const { data, error } = await supabase
         .from('lessons')
-        .select('id, module_id, title, order')
+        .select('id, module_id, title, position') // Select 'position'
         .eq('module_id', moduleId)
-        .order('order', { ascending: true });
-      
+        .order('position', { ascending: true }); // Order by 'position'
+
       if (error) throw error;
-      
+
       if (data) {
         setLessons(data);
       }
     } catch (error) {
       console.error('Error fetching lessons:', error);
-      Alert.alert('Error', 'Failed to load lessons');
+      const displayError = error instanceof Error ? error.message : 'Failed to load lessons';
+      Alert.alert('Error', displayError);
     }
   };
-  
-  // Save module function
+
   const saveModule = async () => {
     if (!title.trim()) {
       Alert.alert('Error', 'Title is required');
       return;
     }
-    
+
     try {
       setIsSaving(true);
-      
+
       const moduleData = {
         title: title.trim(),
-        order,
+        position,
         updated_at: new Date().toISOString(),
       };
-      
+
       if (isNewModule) {
-        // Creating a new module
         const { data, error } = await supabase
           .from('modules')
           .insert({
@@ -116,24 +137,22 @@ export default function ModuleEditScreen({ route, navigation }: any) {
           })
           .select()
           .single();
-        
+
         if (error) throw error;
-        
+
         Alert.alert('Success', 'Module created successfully');
-        // Navigate back with success flag
         navigation.navigate('CourseEdit', {
           courseId,
           refresh: true
         });
       } else {
-        // Updating an existing module
         const { error } = await supabase
           .from('modules')
           .update(moduleData)
           .eq('id', moduleId);
-        
+
         if (error) throw error;
-        
+
         Alert.alert('Success', 'Module updated successfully');
         navigation.navigate('CourseEdit', {
           courseId,
@@ -147,8 +166,7 @@ export default function ModuleEditScreen({ route, navigation }: any) {
       setIsSaving(false);
     }
   };
-  
-  // Delete module
+
   const deleteModule = async () => {
     try {
       Alert.alert(
@@ -161,14 +179,14 @@ export default function ModuleEditScreen({ route, navigation }: any) {
             style: 'destructive',
             onPress: async () => {
               setIsLoading(true);
-              
+
               const { error } = await supabase
                 .from('modules')
                 .delete()
                 .eq('id', moduleId);
-              
+
               if (error) throw error;
-              
+
               Alert.alert('Success', 'Module deleted successfully');
               navigation.navigate('CourseEdit', {
                 courseId,
@@ -184,35 +202,31 @@ export default function ModuleEditScreen({ route, navigation }: any) {
       setIsLoading(false);
     }
   };
-  
-  // Create a new lesson
+
   const createLesson = () => {
-    // Navigate to lesson edit screen with no ID to indicate creating a new lesson
     if (isNewModule) {
       Alert.alert('Info', 'Please save the module first before adding lessons');
       return;
     }
     navigation.navigate('LessonEdit', { moduleId, lessonId: null });
   };
-  
-  // Edit an existing lesson
+
   const editLesson = (lessonId: string) => {
     navigation.navigate('LessonEdit', { moduleId, lessonId });
   };
-  
-  // Render each lesson item
+
   const renderLessonItem = ({ item }: { item: Lesson }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.lessonItem}
       onPress={() => editLesson(item.id)}
     >
       <View style={styles.lessonInfo}>
         <Text style={styles.lessonTitle}>{item.title}</Text>
-        <Text style={styles.lessonOrder}>Order: {item.order}</Text>
+        <Text style={styles.lessonPosition}>Position: {item.position}</Text>
       </View>
     </TouchableOpacity>
   );
-  
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -220,7 +234,7 @@ export default function ModuleEditScreen({ route, navigation }: any) {
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -238,46 +252,34 @@ export default function ModuleEditScreen({ route, navigation }: any) {
           onChangeText={setTitle}
         />
         
-        <Text style={styles.label}>Order</Text>
+        <Text style={styles.label}>Position</Text>
         <TextInput
           style={styles.input}
-          placeholder="Module order (e.g., 1, 2, 3)"
-          value={order.toString()}
-          onChangeText={(text) => setOrder(parseInt(text) || 0)}
+          placeholder="Module position (e.g., 1, 2, 3)"
+          value={position.toString()}
+          onChangeText={(text) => setPosition(parseInt(text) || 0)}
           keyboardType="numeric"
         />
         
-        {/* Action buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[styles.button, styles.cancelButton]}
             onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.buttonText}>Cancel</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
+          ><Text style={styles.buttonText}>Cancel</Text></TouchableOpacity><TouchableOpacity
             style={[styles.button, styles.saveButton, isSaving && styles.disabledButton]}
             onPress={saveModule}
             disabled={isSaving}
-          >
-            <Text style={styles.buttonText}>
-              {isSaving ? 'Saving...' : 'Save Module'}
-            </Text>
-          </TouchableOpacity>
+          ><Text style={styles.buttonText}>{isSaving ? 'Saving...' : 'Save Module'}</Text></TouchableOpacity>
         </View>
         
         {!isNewModule && (
           <TouchableOpacity
             style={[styles.button, styles.deleteButton]}
             onPress={deleteModule}
-          >
-            <Text style={styles.buttonText}>Delete Module</Text>
-          </TouchableOpacity>
+          ><Text style={styles.buttonText}>Delete Module</Text></TouchableOpacity>
         )}
       </View>
       
-      {/* Lessons section - only show for existing modules */}
       {!isNewModule && (
         <View style={styles.lessonsSection}>
           <View style={styles.sectionHeader}>
@@ -285,9 +287,7 @@ export default function ModuleEditScreen({ route, navigation }: any) {
             <TouchableOpacity
               style={styles.addButton}
               onPress={createLesson}
-            >
-              <Text style={styles.addButtonText}>+ Add Lesson</Text>
-            </TouchableOpacity>
+            ><Text style={styles.addButtonText}>+ Add Lesson</Text></TouchableOpacity>
           </View>
           
           {lessons.length === 0 ? (
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  lessonOrder: {
+  lessonPosition: { // Renamed from lessonOrder for clarity
     fontSize: 12,
     color: '#666',
     backgroundColor: '#f1f3f4',

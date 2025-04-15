@@ -97,6 +97,7 @@ export default function CourseEditScreen({ route, navigation }: any) {
   };
 
   const fetchModules = async () => {
+    if (!courseId) return;
     try {
       const { data, error } = await supabase
         .from('modules')
@@ -320,7 +321,7 @@ export default function CourseEditScreen({ route, navigation }: any) {
     >
       <View style={styles.moduleInfo}>
         <Text style={styles.moduleTitle}>{item.title}</Text>
-        <Text style={styles.moduleOrder}>Position: {item.position}</Text>
+        <Text style={styles.modulePosition}>Position: {item.position}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -684,7 +685,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  moduleOrder: {
+  modulePosition: {
     fontSize: 12,
     color: '#666',
     backgroundColor: '#f1f3f4',

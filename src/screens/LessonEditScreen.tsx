@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform, // Import Platform
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -23,52 +24,78 @@ type Lesson = {
   content: string | null;
   type: 'text' | 'video' | 'image' | 'audio';
   media_url: string | null;
-  order: number;
+  position: number; // Changed from 'order' to 'position'
   created_at: string;
   updated_at: string;
 };
+
+// Function to convert data URI to Blob
+function dataURIToBlob(dataURI: string): Blob | null {
+  try {
+    // Split the data URI to get the base64 data and MIME type
+    const splitDataURI = dataURI.split(',');
+    if (splitDataURI.length < 2) return null; // Invalid format
+
+    const byteString = splitDataURI[0].includes('base64')
+      ? atob(splitDataURI[1]) // Decode base64
+      : decodeURIComponent(splitDataURI[1]); // Handle URL-encoded data
+
+    const mimeString = splitDataURI[0].split(':')[1].split(';')[0];
+
+    // Write the bytes of the string to an ArrayBuffer
+    const ia = new Uint8Array(byteString.length);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+
+    return new Blob([ia], { type: mimeString });
+  } catch (error) {
+    console.error("Error converting data URI to Blob:", error);
+    return null;
+  }
+}
 
 export default function LessonEditScreen({ route, navigation }: any) {
   const { moduleId, lessonId } = route.params;
   const { session } = useAuth(); // Get session using the hook
   const userId = session?.user?.id; // Extract user ID
   const isNewLesson = lessonId === null;
-  
+
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'text' | 'video' | 'image' | 'audio'>('text');
-  const [order, setOrder] = useState(0);
+  const [position, setPosition] = useState(0); // Renamed from 'order'
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Get lesson data if editing an existing lesson
   useEffect(() => {
     if (!isNewLesson) {
       fetchLessonData();
     } else {
-      // For new lessons, set the order to be one more than the highest order
-      getNextOrderNumber();
+      // For new lessons, set the position to be one more than the highest position
+      getNextPositionNumber(); // Renamed from getNextOrderNumber
     }
   }, [lessonId]);
-  
+
   const fetchLessonData = async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('lessons')
-        .select('*')
+        .select('*') // Selects all columns, including 'position'
         .eq('id', lessonId)
         .single();
-      
+
       if (error) throw error;
-      
+
       if (data) {
         setTitle(data.title);
         setContent(data.content || '');
         setMediaUrl(data.media_url);
         setMediaType(data.type || 'text');
-        setOrder(data.order);
+        setPosition(data.position); // Set 'position'
       }
     } catch (error) {
       console.error('Error fetching lesson:', error);
@@ -77,29 +104,29 @@ export default function LessonEditScreen({ route, navigation }: any) {
       setIsLoading(false);
     }
   };
-  
-  // Find the next available order number for a new lesson
-  const getNextOrderNumber = async () => {
+
+  // Find the next available position number for a new lesson
+  const getNextPositionNumber = async () => { // Renamed from getNextOrderNumber
     try {
       const { data, error } = await supabase
         .from('lessons')
-        .select('order')
+        .select('position') // Select 'position'
         .eq('module_id', moduleId)
-        .order('order', { ascending: false })
+        .order('position', { ascending: false }) // Order by 'position'
         .limit(1);
-      
+
       if (error) throw error;
-      
-      // If there are existing lessons, set order to highest + 1, otherwise start at 1
-      const nextOrder = data && data.length > 0 ? data[0].order + 1 : 1;
-      setOrder(nextOrder);
+
+      // If there are existing lessons, set position to highest + 1, otherwise start at 1
+      const nextPosition = data && data.length > 0 ? data[0].position + 1 : 1;
+      setPosition(nextPosition); // Set 'position'
     } catch (error) {
-      console.error('Error getting next order number:', error);
-      // Default to order 1 if there's an error
-      setOrder(1);
+      console.error('Error getting next position number:', error);
+      // Default to position 1 if there's an error
+      setPosition(1); // Set 'position'
     }
   };
-  
+
   // Pick an image from the library
   const pickImage = async () => {
     if (!userId) {
@@ -111,12 +138,12 @@ export default function LessonEditScreen({ route, navigation }: any) {
       allowsEditing: true,
       quality: 0.8,
     });
-    
+
     if (!result.canceled) {
       try {
         const imageUri = result.assets[0].uri;
         // Pass userId to uploadMedia
-        const uploadedUrl = await uploadMedia(imageUri, 'image', userId); 
+        const uploadedUrl = await uploadMedia(imageUri, 'image', userId);
         if (uploadedUrl) {
           setMediaUrl(uploadedUrl);
           setMediaType('image');
@@ -127,7 +154,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
       }
     }
   };
-  
+
   // Pick a document (video, audio)
   const pickDocument = async (type: 'video' | 'audio') => {
     if (!userId) {
@@ -139,13 +166,13 @@ export default function LessonEditScreen({ route, navigation }: any) {
         type: type === 'video' ? 'video/*' : 'audio/*',
         copyToCacheDirectory: true,
       });
-      
+
       if (result.canceled) return;
-      
+
       const uri = result.assets[0].uri;
       // Pass userId to uploadMedia
-      const uploadedUrl = await uploadMedia(uri, type, userId); 
-      
+      const uploadedUrl = await uploadMedia(uri, type, userId);
+
       if (uploadedUrl) {
         setMediaUrl(uploadedUrl);
         setMediaType(type);
@@ -155,69 +182,122 @@ export default function LessonEditScreen({ route, navigation }: any) {
       Alert.alert('Error', `Failed to select ${type} file`);
     }
   };
-  
+
   // Upload media to Supabase storage
-  const uploadMedia = async (uri: string, type: 'image' | 'video' | 'audio', userId: string) => { // Add userId parameter
+  const uploadMedia = async (uri: string, type: 'image' | 'video' | 'audio', userId: string) => {
     if (!userId) {
       console.error('Upload attempted without user ID');
       Alert.alert('Error', 'Authentication error, cannot upload file.');
       return null;
     }
     try {
-      // Get file extension
-      const fileExt = uri.split('.').pop()?.toLowerCase() || '';
+      let blob: Blob | null = null;
+      let fileExt = '';
+      let contentType = '';
+
+      // Check if the URI is a data URI (common on web for images)
+      if (uri.startsWith('data:')) {
+        blob = dataURIToBlob(uri);
+        if (blob) {
+          contentType = blob.type;
+          fileExt = contentType.split('/')[1] || '';
+        } else {
+          throw new Error("Failed to convert data URI to Blob.");
+        }
+      } else {
+        // For file URIs (common on native), fetch the resource
+        const response = await fetch(uri);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file URI: ${response.statusText}`);
+        }
+        blob = await response.blob();
+        contentType = blob.type;
+        // Try to get extension from URI first, fallback to MIME type
+        const uriParts = uri.split('.');
+        fileExt = uriParts.length > 1 ? uriParts.pop()?.toLowerCase() || '' : '';
+        if (!fileExt && contentType) {
+          fileExt = contentType.split('/')[1] || '';
+        }
+      }
+
+      if (!blob) {
+        throw new Error("Could not create Blob for upload.");
+      }
+
+      fileExt = fileExt || (type === 'image' ? 'jpg' : (type === 'video' ? 'mp4' : 'mp3')); // Provide default extensions
+
       const fileName = `lesson_${type}_${Date.now()}.${fileExt}`;
-      // Use user-specific path
-      const filePath = `${userId}/lesson_content/${fileName}`; 
-      
-      // Convert URI to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
+      const filePath = `${userId}/lesson_content/${fileName}`;
+
       // Upload to Supabase Storage
-      const { error } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('course-content')
-        .upload(filePath, blob);
-      
-      if (error) throw error;
-      
+        .upload(filePath, blob, {
+          contentType: contentType || undefined, // Pass content type if available
+          upsert: false, // Avoid overwriting existing files unintentionally
+        });
+
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError);
+        // Provide more specific feedback if possible
+        if (uploadError.message.includes('Bucket not found')) {
+          Alert.alert('Upload Error', 'Storage bucket "course-content" not found. Please check Supabase setup.');
+        } else if (uploadError.message.includes('policy')) {
+          Alert.alert('Upload Error', 'Storage policy denied the upload. Check RLS policies for Storage.');
+        } else {
+          Alert.alert('Upload Error', `Failed to upload file: ${uploadError.message}`);
+        }
+        return null; // Return null on error
+      }
+
       // Get public URL
-      const { data } = supabase.storage
+      const { data: urlData } = supabase.storage
         .from('course-content')
         .getPublicUrl(filePath);
-      
-      return data?.publicUrl || null;
+
+      if (!urlData?.publicUrl) {
+        console.error("Failed to get public URL after upload. Check bucket policies and file path:", filePath);
+        Alert.alert('Upload Error', 'File uploaded, but could not retrieve public URL. Check bucket policies.');
+        return null;
+      }
+
+      console.log("Public URL generated:", urlData.publicUrl);
+      return urlData.publicUrl;
+
     } catch (error) {
       console.error(`Error uploading ${type}:`, error);
+      // More specific error reporting
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred during upload.';
+      Alert.alert('Upload Error', message);
       return null;
     }
   };
-  
+
   // Remove the current media
   const removeMedia = () => {
     setMediaUrl(null);
     setMediaType('text');
   };
-  
+
   // Save lesson function
   const saveLesson = async () => {
     if (!title.trim()) {
       Alert.alert('Error', 'Title is required');
       return;
     }
-    
+
     try {
       setIsSaving(true);
-      
+
       const lessonData = {
         title: title.trim(),
         content: content.trim() || null,
         type: mediaType,
         media_url: mediaUrl,
-        order,
+        position, // Use 'position'
         updated_at: new Date().toISOString(),
       };
-      
+
       if (isNewLesson) {
         // Creating a new lesson
         const { data, error } = await supabase
@@ -229,9 +309,9 @@ export default function LessonEditScreen({ route, navigation }: any) {
           })
           .select()
           .single();
-        
+
         if (error) throw error;
-        
+
         Alert.alert('Success', 'Lesson created successfully');
         navigation.navigate('ModuleEdit', {
           moduleId,
@@ -243,9 +323,9 @@ export default function LessonEditScreen({ route, navigation }: any) {
           .from('lessons')
           .update(lessonData)
           .eq('id', lessonId);
-        
+
         if (error) throw error;
-        
+
         Alert.alert('Success', 'Lesson updated successfully');
         navigation.navigate('ModuleEdit', {
           moduleId,
@@ -259,7 +339,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
       setIsSaving(false);
     }
   };
-  
+
   // Delete lesson
   const deleteLesson = async () => {
     try {
@@ -273,14 +353,14 @@ export default function LessonEditScreen({ route, navigation }: any) {
             style: 'destructive',
             onPress: async () => {
               setIsLoading(true);
-              
+
               const { error } = await supabase
                 .from('lessons')
                 .delete()
                 .eq('id', lessonId);
-              
+
               if (error) throw error;
-              
+
               Alert.alert('Success', 'Lesson deleted successfully');
               navigation.navigate('ModuleEdit', {
                 moduleId,
@@ -296,7 +376,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
       setIsLoading(false);
     }
   };
-  
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -304,7 +384,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
       </View>
     );
   }
-  
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -312,7 +392,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
           {isNewLesson ? 'Create Lesson' : 'Edit Lesson'}
         </Text>
       </View>
-      
+
       <View style={styles.form}>
         <Text style={styles.label}>Title *</Text>
         <TextInput
@@ -321,16 +401,16 @@ export default function LessonEditScreen({ route, navigation }: any) {
           value={title}
           onChangeText={setTitle}
         />
-        
-        <Text style={styles.label}>Order</Text>
+
+        <Text style={styles.label}>Position</Text> {/* Changed label */}
         <TextInput
           style={styles.input}
-          placeholder="Lesson order (e.g., 1, 2, 3)"
-          value={order.toString()}
-          onChangeText={(text) => setOrder(parseInt(text) || 0)}
+          placeholder="Lesson position (e.g., 1, 2, 3)" // Changed placeholder
+          value={position.toString()} // Use 'position' state
+          onChangeText={(text) => setPosition(parseInt(text) || 0)} // Update 'position' state
           keyboardType="numeric"
         />
-        
+
         {/* Media type selection */}
         <Text style={styles.label}>Content Type</Text>
         <View style={styles.mediaTypeSelector}>
@@ -350,7 +430,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
               Text
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.mediaTypeButton,
@@ -367,7 +447,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
               Image
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.mediaTypeButton,
@@ -384,7 +464,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
               Video
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.mediaTypeButton,
@@ -402,7 +482,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
             </Text>
           </TouchableOpacity>
         </View>
-        
+
         {/* Content text area (for text type or additional info) */}
         <Text style={styles.label}>
           {mediaType === 'text' ? 'Lesson Content *' : 'Additional Content Information'}
@@ -415,12 +495,12 @@ export default function LessonEditScreen({ route, navigation }: any) {
           multiline
           numberOfLines={8}
         />
-        
+
         {/* Media upload buttons (if not text type) */}
         {mediaType !== 'text' && (
           <View style={styles.mediaSection}>
             <Text style={styles.label}>Media Upload</Text>
-            
+
             {mediaType === 'image' && (
               <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
                 <Text style={styles.uploadButtonText}>
@@ -428,7 +508,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
                 </Text>
               </TouchableOpacity>
             )}
-            
+
             {mediaType === 'video' && (
               <TouchableOpacity 
                 style={styles.uploadButton} 
@@ -439,7 +519,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
                 </Text>
               </TouchableOpacity>
             )}
-            
+
             {mediaType === 'audio' && (
               <TouchableOpacity 
                 style={styles.uploadButton} 
@@ -450,7 +530,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
                 </Text>
               </TouchableOpacity>
             )}
-            
+
             {/* Media preview */}
             {mediaUrl && (
               <View style={styles.mediaPreviewContainer}>
@@ -461,10 +541,10 @@ export default function LessonEditScreen({ route, navigation }: any) {
                     resizeMode="contain"
                   />
                 )}
-                
+
                 {(mediaType === 'video' || mediaType === 'audio') && (
                   <View style={styles.mediaFileInfo}>
-                    <Text style={styles.mediaFileName}>
+                    <Text style={styles.mediaFileName} numberOfLines={1} ellipsizeMode="middle">
                       {mediaUrl.split('/').pop()}
                     </Text>
                     <Text style={styles.mediaFileType}>
@@ -472,7 +552,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
                     </Text>
                   </View>
                 )}
-                
+
                 <TouchableOpacity 
                   style={styles.removeMediaButton}
                   onPress={removeMedia}
@@ -483,7 +563,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
             )}
           </View>
         )}
-        
+
         {/* Action buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
@@ -492,7 +572,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
           >
             <Text style={styles.buttonText}>Cancel</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.button, styles.saveButton, isSaving && styles.disabledButton]}
             onPress={saveLesson}
@@ -503,7 +583,7 @@ export default function LessonEditScreen({ route, navigation }: any) {
             </Text>
           </TouchableOpacity>
         </View>
-        
+
         {/* Delete button for existing lessons */}
         {!isNewLesson && (
           <TouchableOpacity
