@@ -9,6 +9,8 @@ import CourseListScreen from './src/screens/CourseListScreen';
 import CourseEditScreen from './src/screens/CourseEditScreen';
 import ModuleEditScreen from './src/screens/ModuleEditScreen';
 import LessonEditScreen from './src/screens/LessonEditScreen';
+import ProfileEditScreen from './src/screens/ProfileEditScreen'; // Import the new screen
+import TopBar from './src/components/TopBar'; // Import the TopBar component
 import { supabase } from './src/lib/supabase';
 
 // Define the stack navigator types
@@ -17,6 +19,7 @@ type RootStackParamList = {
   CourseEdit: { courseId: string | null; refresh?: boolean };
   ModuleEdit: { courseId: string; moduleId: string | null; refresh?: boolean };
   LessonEdit: { moduleId: string; lessonId: string | null; refresh?: boolean };
+  ProfileEdit: undefined; // Add ProfileEditScreen to the list
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -97,50 +100,54 @@ function MainContent() {
   // User is logged in - show the main app navigation
   return (
     <NavigationContainer>
-      <Stack.Navigator 
-        initialRouteName="CourseList"
-        screenOptions={{
-          headerStyle: { backgroundColor: '#FFFFFF' },
-          headerTintColor: '#212529',
-          headerTitleStyle: { fontWeight: '600', fontSize: 18 },
-          headerBackTitleVisible: false,
-        }}
-      >
-        <Stack.Screen 
-          name="CourseList" 
-          component={CourseListScreen} 
-          options={{
-            title: "Meus Cursos", // This title is overridden by the component's header
-            headerRight: () => (
-              <Text style={styles.signOutButton} onPress={signOut}>
-                Sign Out
-              </Text>
-            ),
+      <View style={{ flex: 1 }}>
+        <TopBar />
+        <Stack.Navigator
+          initialRouteName="CourseList"
+          screenOptions={{
+            headerStyle: { backgroundColor: '#FFFFFF' },
+            headerTintColor: '#212529',
+            headerTitleStyle: { fontWeight: '600', fontSize: 18 },
+            headerBackTitleVisible: false,
           }}
-        />
-        <Stack.Screen 
-          name="CourseEdit" 
-          component={CourseEditScreen} 
-          options={({ route }) => ({
-            title: route.params?.courseId ? "Editar Curso" : "Criar Curso",
-          })}
-        />
-        <Stack.Screen 
-          name="ModuleEdit" 
-          component={ModuleEditScreen} 
-          options={({ route }) => ({
-            title: route.params?.moduleId ? "Editar Módulo" : "Criar Módulo",
-          })}
-        />
-        <Stack.Screen 
-          name="LessonEdit" 
-          component={LessonEditScreen} 
-          options={({ route }) => ({
-            title: route.params?.lessonId ? "Editar Lição" : "Criar Lição",
-          })}
-        />
-      </Stack.Navigator>
-      <StatusBar style="auto" />
+        >
+          <Stack.Screen
+            name="CourseList"
+            component={CourseListScreen}
+            options={{
+              title: "Meus Cursos", // This title is overridden by the component's header
+              // headerRight is removed as Sign Out is now in TopBar
+            }}
+          />
+          <Stack.Screen
+            name="CourseEdit"
+            component={CourseEditScreen}
+            options={({ route }) => ({
+              title: route.params?.courseId ? "Editar Curso" : "Criar Curso",
+            })}
+          />
+          <Stack.Screen
+            name="ModuleEdit"
+            component={ModuleEditScreen}
+            options={({ route }) => ({
+              title: route.params?.moduleId ? "Editar Módulo" : "Criar Módulo",
+            })}
+          />
+          <Stack.Screen
+            name="LessonEdit"
+            component={LessonEditScreen}
+            options={({ route }) => ({
+              title: route.params?.lessonId ? "Editar Lição" : "Criar Lição",
+            })}
+          />
+          <Stack.Screen
+            name="ProfileEdit"
+            component={ProfileEditScreen}
+            options={{ title: "Editar Perfil" }}
+          />
+        </Stack.Navigator>
+        <StatusBar style="auto" />
+      </View>
     </NavigationContainer>
   );
 }
@@ -186,12 +193,5 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: 'center',
     color: '#6C757D',
-  },
-  signOutButton: {
-    color: '#007BFF', // Updated sign out button color
-    fontSize: 16,
-    fontWeight: '500',
-    marginRight: Platform.OS === 'ios' ? 0 : 15, // Adjust padding for Android
-    paddingVertical: 5,
   },
 });
