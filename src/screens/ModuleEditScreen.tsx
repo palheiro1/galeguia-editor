@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 
-// Module type definition
+// Definição do tipo do módulo
 type Module = {
   id: string;
   course_id: string;
@@ -21,12 +21,12 @@ type Module = {
   updated_at: string;
 };
 
-// Lesson type definition for the list
+// Definição do tipo da lição para a lista
 type Lesson = {
   id: string;
   module_id: string;
   title: string;
-  position: number; // Changed from 'order' to 'position'
+  position: number; // Mudado de 'order' para 'position'
 };
 
 export default function ModuleEditScreen({ route, navigation }: any) {
@@ -39,7 +39,7 @@ export default function ModuleEditScreen({ route, navigation }: any) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Get module data if editing an existing module
+  // Buscar dados do módulo se estiver editando um módulo existente
   useEffect(() => {
     if (!isNewModule) {
       fetchModuleData();
@@ -65,8 +65,8 @@ export default function ModuleEditScreen({ route, navigation }: any) {
         setPosition(data.position);
       }
     } catch (error) {
-      console.error('Error fetching module:', error);
-      Alert.alert('Error', 'Failed to load module data');
+      console.error('Erro ao buscar módulo:', error);
+      Alert.alert('Erro', 'Falha ao carregar os dados do módulo');
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +86,7 @@ export default function ModuleEditScreen({ route, navigation }: any) {
       const nextPosition = data && data.length > 0 ? data[0].position + 1 : 1;
       setPosition(nextPosition);
     } catch (error) {
-      console.error('Error getting next position number:', error);
+      console.error('Erro ao obter próximo número de posição:', error);
       setPosition(1);
     }
   };
@@ -96,9 +96,9 @@ export default function ModuleEditScreen({ route, navigation }: any) {
     try {
       const { data, error } = await supabase
         .from('lessons')
-        .select('id, module_id, title, position') // Select 'position'
+        .select('id, module_id, title, position') // Selecionar 'position'
         .eq('module_id', moduleId)
-        .order('position', { ascending: true }); // Order by 'position'
+        .order('position', { ascending: true }); // Ordenar por 'position'
 
       if (error) throw error;
 
@@ -106,15 +106,15 @@ export default function ModuleEditScreen({ route, navigation }: any) {
         setLessons(data);
       }
     } catch (error) {
-      console.error('Error fetching lessons:', error);
-      const displayError = error instanceof Error ? error.message : 'Failed to load lessons';
-      Alert.alert('Error', displayError);
+      console.error('Erro ao buscar lições:', error);
+      const displayError = error instanceof Error ? error.message : 'Falha ao carregar as lições';
+      Alert.alert('Erro', displayError);
     }
   };
 
   const saveModule = async () => {
     if (!title.trim()) {
-      Alert.alert('Error', 'Title is required');
+      Alert.alert('Erro', 'O título é obrigatório');
       return;
     }
 
@@ -140,7 +140,7 @@ export default function ModuleEditScreen({ route, navigation }: any) {
 
         if (error) throw error;
 
-        Alert.alert('Success', 'Module created successfully');
+        Alert.alert('Sucesso', 'Módulo criado com sucesso');
         navigation.navigate('CourseEdit', {
           courseId,
           refresh: true
@@ -153,15 +153,15 @@ export default function ModuleEditScreen({ route, navigation }: any) {
 
         if (error) throw error;
 
-        Alert.alert('Success', 'Module updated successfully');
+        Alert.alert('Sucesso', 'Módulo atualizado com sucesso');
         navigation.navigate('CourseEdit', {
           courseId,
           refresh: true
         });
       }
     } catch (error) {
-      console.error('Error saving module:', error);
-      Alert.alert('Error', 'Failed to save module');
+      console.error('Erro ao salvar módulo:', error);
+      Alert.alert('Erro', 'Falha ao salvar módulo');
     } finally {
       setIsSaving(false);
     }
@@ -170,12 +170,12 @@ export default function ModuleEditScreen({ route, navigation }: any) {
   const deleteModule = async () => {
     try {
       Alert.alert(
-        'Confirm Delete',
-        'Are you sure you want to delete this module? This will also delete all lessons in this module.',
+        'Confirmar Exclusão',
+        'Você tem certeza que deseja excluir este módulo? Isso também excluirá todas as lições deste módulo.',
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: 'Cancelar', style: 'cancel' },
           {
-            text: 'Delete',
+            text: 'Excluir',
             style: 'destructive',
             onPress: async () => {
               setIsLoading(true);
@@ -187,7 +187,7 @@ export default function ModuleEditScreen({ route, navigation }: any) {
 
               if (error) throw error;
 
-              Alert.alert('Success', 'Module deleted successfully');
+              Alert.alert('Sucesso', 'Módulo excluído com sucesso');
               navigation.navigate('CourseEdit', {
                 courseId,
                 refresh: true
@@ -197,15 +197,15 @@ export default function ModuleEditScreen({ route, navigation }: any) {
         ]
       );
     } catch (error) {
-      console.error('Error deleting module:', error);
-      Alert.alert('Error', 'Failed to delete module');
+      console.error('Erro ao excluir módulo:', error);
+      Alert.alert('Erro', 'Falha ao excluir módulo');
       setIsLoading(false);
     }
   };
 
   const createLesson = () => {
     if (isNewModule) {
-      Alert.alert('Info', 'Please save the module first before adding lessons');
+      Alert.alert('Informação', 'Por favor, salve o módulo primeiro antes de adicionar lições');
       return;
     }
     navigation.navigate('LessonEdit', { moduleId, lessonId: null });
@@ -222,7 +222,7 @@ export default function ModuleEditScreen({ route, navigation }: any) {
     >
       <View style={styles.lessonInfo}>
         <Text style={styles.lessonTitle}>{item.title}</Text>
-        <Text style={styles.lessonPosition}>Position: {item.position}</Text>
+        <Text style={styles.lessonPosition}>Posição: {item.position}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -239,23 +239,23 @@ export default function ModuleEditScreen({ route, navigation }: any) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {isNewModule ? 'Create Module' : 'Edit Module'}
+          {isNewModule ? 'Criar Módulo' : 'Editar Módulo'}
         </Text>
       </View>
       
       <View style={styles.form}>
-        <Text style={styles.label}>Title *</Text>
+        <Text style={styles.label}>Título *</Text>
         <TextInput
           style={styles.input}
-          placeholder="Module title"
+          placeholder="Título do módulo"
           value={title}
           onChangeText={setTitle}
         />
         
-        <Text style={styles.label}>Position</Text>
+        <Text style={styles.label}>Posição</Text>
         <TextInput
           style={styles.input}
-          placeholder="Module position (e.g., 1, 2, 3)"
+          placeholder="Posição do módulo (ex: 1, 2, 3)"
           value={position.toString()}
           onChangeText={(text) => setPosition(parseInt(text) || 0)}
           keyboardType="numeric"
@@ -265,35 +265,35 @@ export default function ModuleEditScreen({ route, navigation }: any) {
           <TouchableOpacity
             style={[styles.button, styles.cancelButton]}
             onPress={() => navigation.goBack()}
-          ><Text style={styles.buttonText}>Cancel</Text></TouchableOpacity><TouchableOpacity
+          ><Text style={styles.buttonText}>Cancelar</Text></TouchableOpacity><TouchableOpacity
             style={[styles.button, styles.saveButton, isSaving && styles.disabledButton]}
             onPress={saveModule}
             disabled={isSaving}
-          ><Text style={styles.buttonText}>{isSaving ? 'Saving...' : 'Save Module'}</Text></TouchableOpacity>
+          ><Text style={styles.buttonText}>{isSaving ? 'Salvando...' : 'Salvar Módulo'}</Text></TouchableOpacity>
         </View>
         
         {!isNewModule && (
           <TouchableOpacity
             style={[styles.button, styles.deleteButton]}
             onPress={deleteModule}
-          ><Text style={styles.buttonText}>Delete Module</Text></TouchableOpacity>
+          ><Text style={styles.buttonText}>Excluir Módulo</Text></TouchableOpacity>
         )}
       </View>
       
       {!isNewModule && (
         <View style={styles.lessonsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Lessons</Text>
+            <Text style={styles.sectionTitle}>Lições</Text>
             <TouchableOpacity
               style={styles.addButton}
               onPress={createLesson}
-            ><Text style={styles.addButtonText}>+ Add Lesson</Text></TouchableOpacity>
+            ><Text style={styles.addButtonText}>+ Adicionar Lição</Text></TouchableOpacity>
           </View>
           
           {lessons.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
-                No lessons yet. Click "Add Lesson" to create one.
+                Nenhuma lição ainda. Clique em "Adicionar Lição" para criar uma.
               </Text>
             </View>
           ) : (
@@ -421,23 +421,19 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 4,
     marginBottom: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4285F4',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   lessonInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
   lessonTitle: {
     fontSize: 16,
     fontWeight: '500',
   },
-  lessonPosition: { // Renamed from lessonOrder for clarity
-    fontSize: 12,
-    color: '#666',
-    backgroundColor: '#f1f3f4',
-    padding: 4,
-    borderRadius: 4,
+  lessonPosition: {
+    fontSize: 14,
+    color: '#555',
   },
 });

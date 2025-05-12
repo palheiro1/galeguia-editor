@@ -57,7 +57,7 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
   if (!authChecked && Platform.OS === 'web') {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4285F4" />
+        <ActivityIndicator size="large" color="#007BFF" />
         <Text style={styles.loadingText}>Processing authentication...</Text>
       </View>
     );
@@ -73,7 +73,7 @@ function MainContent() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4285F4" />
+        <ActivityIndicator size="large" color="#007BFF" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -88,7 +88,7 @@ function MainContent() {
   if (!profile) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="small" color="#4285F4" />
+        <ActivityIndicator size="small" color="#007BFF" />
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
@@ -97,12 +97,20 @@ function MainContent() {
   // User is logged in - show the main app navigation
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="CourseList">
+      <Stack.Navigator 
+        initialRouteName="CourseList"
+        screenOptions={{
+          headerStyle: { backgroundColor: '#FFFFFF' },
+          headerTintColor: '#212529',
+          headerTitleStyle: { fontWeight: '600', fontSize: 18 },
+          headerBackTitleVisible: false,
+        }}
+      >
         <Stack.Screen 
           name="CourseList" 
           component={CourseListScreen} 
           options={{
-            title: "My Courses",
+            title: "Meus Cursos", // This title is overridden by the component's header
             headerRight: () => (
               <Text style={styles.signOutButton} onPress={signOut}>
                 Sign Out
@@ -114,21 +122,21 @@ function MainContent() {
           name="CourseEdit" 
           component={CourseEditScreen} 
           options={({ route }) => ({
-            title: route.params?.courseId ? "Edit Course" : "Create Course",
+            title: route.params?.courseId ? "Editar Curso" : "Criar Curso",
           })}
         />
         <Stack.Screen 
           name="ModuleEdit" 
           component={ModuleEditScreen} 
           options={({ route }) => ({
-            title: route.params?.moduleId ? "Edit Module" : "Create Module",
+            title: route.params?.moduleId ? "Editar Módulo" : "Criar Módulo",
           })}
         />
         <Stack.Screen 
           name="LessonEdit" 
           component={LessonEditScreen} 
           options={({ route }) => ({
-            title: route.params?.lessonId ? "Edit Lesson" : "Create Lesson",
+            title: route.params?.lessonId ? "Editar Lição" : "Criar Lição",
           })}
         />
       </Stack.Navigator>
@@ -151,7 +159,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8F9FA', // Updated background
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -159,7 +167,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#777',
+    color: '#6C757D', // Updated text color
   },
   welcomeText: {
     fontSize: 24,
@@ -172,17 +180,18 @@ const styles = StyleSheet.create({
   },
   highlight: {
     fontWeight: 'bold',
-    color: '#4285F4',
+    color: '#007BFF', // Updated highlight color
   },
   infoText: {
     marginTop: 20,
     textAlign: 'center',
-    color: '#555',
+    color: '#6C757D',
   },
   signOutButton: {
-    color: '#4285F4',
+    color: '#007BFF', // Updated sign out button color
     fontSize: 16,
-    fontWeight: 'bold',
-    padding: 10,
+    fontWeight: '500',
+    marginRight: Platform.OS === 'ios' ? 0 : 15, // Adjust padding for Android
+    paddingVertical: 5,
   },
 });

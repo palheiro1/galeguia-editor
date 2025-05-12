@@ -3,8 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
 import { Platform } from 'react-native';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Use fixed values if environment variables are not available
+// In production, these should be set in your deployment environment
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-supabase-project-url.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-supabase-anon-key';
 
 // Use a web-compatible AsyncStorage adapter
 const isWeb = typeof window !== 'undefined' && !!window.localStorage;

@@ -7,13 +7,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Platform, // Import Platform
+  Platform,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { useFocusEffect } from '@react-navigation/native'; // Import useFocusEffect
+import { useFocusEffect } from '@react-navigation/native';
 
-// Define the Course type based on our database schema
 type Course = {
   id: string;
   title: string;
@@ -28,145 +27,130 @@ export default function CourseListScreen({ navigation }: any) {
   const [loading, setLoading] = useState<boolean>(true);
   const { profile } = useAuth();
 
-  // Fetch courses based on user role
   const fetchCourses = async () => {
-    // Guard: Don't fetch if profile hasn't loaded yet
     if (!profile) {
-      console.log("fetchCourses skipped: profile not loaded yet.");
+      console.log("fetchCourses ignorado: perfil ainda não carregado.");
       return;
     }
 
     try {
       setLoading(true);
-      console.log(`Fetching courses for role: ${profile.role}`);
+      console.log(`A obter cursos para o papel: ${profile.role}`);
 
-      // Query depends on user role (admin sees all, creator sees own)
       let query = supabase.from('courses').select('*');
 
-      // If not admin, only show user's own courses
       if (profile.role !== 'admin') {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          console.log(`Fetching courses for creator_id: ${user.id}`);
+          console.log(`A obter cursos para creator_id: ${user.id}`);
           query = query.eq('creator_id', user.id);
         } else {
-          console.warn("Profile exists but user is null, cannot fetch creator courses.");
+          console.warn("Perfil existe mas utilizador é nulo, impossível obter cursos.");
           setCourses([]);
           setLoading(false);
           return;
         }
       } else {
-        console.log("Fetching all courses as admin.");
+        console.log("A obter todos os cursos como admin.");
       }
 
-      // Sort by created date, newest first
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Supabase fetch error:', error);
+        console.error('Erro ao obter cursos do Supabase:', error);
         throw error;
       }
 
       if (data) {
-        console.log(`Fetched ${data.length} courses.`);
+        console.log(`Obtidos ${data.length} cursos.`);
         setCourses(data as Course[]);
       } else {
-        console.log("No courses found for the current filter.");
+        console.log("Nenhum curso encontrado para o filtro atual.");
         setCourses([]);
       }
     } catch (error) {
-      console.error('Error fetching courses:', error);
-      Alert.alert('Error', `Failed to load courses: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Erro ao obter cursos:', error);
+      Alert.alert('Erro', `Falha ao carregar cursos: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       setCourses([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Use useFocusEffect to refresh the list when navigating back
   useFocusEffect(
     React.useCallback(() => {
-      console.log("CourseListScreen focused, fetching courses...");
+      console.log("CourseListScreen focado, a obter cursos...");
       fetchCourses();
-    }, [profile]) // Add profile to dependency array
+    }, [profile])
   );
 
-  // Delete a course
   const deleteCourse = async (id: string) => {
-    console.log(`Delete button pressed for course ID: ${id}`);
+    console.log(`Botão de eliminar premido para o curso ID: ${id}`);
 
-    const confirmMessage = 'Are you sure you want to delete this course? This will also delete all associated modules and lessons and cannot be undone.';
+    const confirmMessage = 'Tens a certeza que queres eliminar este curso? Isto também eliminará todos os módulos e lições associadas e não pode ser desfeito.';
 
     const performDelete = async () => {
-      console.log(`Confirmed delete for course ID: ${id}`);
+      console.log(`Eliminação confirmada para o curso ID: ${id}`);
       try {
-        setLoading(true); // Show loading indicator during deletion
+        setLoading(true);
         const { error } = await supabase.from('courses').delete().eq('id', id);
 
         if (error) {
-          console.error('Supabase delete error:', error); // Log the specific error
-          throw error; // Re-throw to be caught by the catch block
+          console.error('Erro ao eliminar no Supabase:', error);
+          throw error;
         }
 
-        Alert.alert('Success', 'Course deleted successfully');
-        // useFocusEffect will handle the refresh
+        Alert.alert('Sucesso', 'Curso eliminado com sucesso');
       } catch (error) {
-        console.error('Error during course deletion process:', error); // Log error in catch
+        console.error('Erro durante a eliminação do curso:', error);
         Alert.alert(
-          'Error',
-          `Failed to delete course: ${error instanceof Error ? error.message : 'Unknown error'}. Check console and RLS policies.`
+          'Erro',
+          `Falha ao eliminar curso: ${error instanceof Error ? error.message : 'Erro desconhecido'}. Verifica a consola e políticas RLS.`
         );
-      } finally {
-        // setLoading(false); // Let useFocusEffect's fetchCourses handle this
       }
     };
 
     if (Platform.OS === 'web') {
-      // Use window.confirm for web
       if (window.confirm(confirmMessage)) {
         await performDelete();
       } else {
-        console.log(`Delete cancelled for course ID: ${id}`);
+        console.log(`Eliminação cancelada para o curso ID: ${id}`);
       }
     } else {
-      // Use Alert.alert for native platforms
       Alert.alert(
-        'Confirm Delete',
+        'Confirmar Eliminação',
         confirmMessage,
         [
-          { text: 'Cancel', style: 'cancel', onPress: () => console.log(`Delete cancelled for course ID: ${id}`) },
+          { text: 'Cancelar', style: 'cancel', onPress: () => console.log(`Eliminação cancelada para o curso ID: ${id}`) },
           {
-            text: 'Delete',
+            text: 'Eliminar',
             style: 'destructive',
-            onPress: performDelete // Call the async function
+            onPress: performDelete
           }
         ]
       );
     }
   };
 
-  // Create a new course
   const createNewCourse = () => {
     navigation.navigate('CourseEdit', { courseId: null });
   };
 
-  // Edit an existing course
   const editCourse = (courseId: string) => {
     navigation.navigate('CourseEdit', { courseId });
   };
 
-  // Render each course item
   const renderCourseItem = ({ item }: { item: Course }) => (
     <View style={styles.courseItem}>
       <View style={styles.courseInfo}>
         <Text style={styles.courseTitle}>{item.title}</Text>
         <Text style={styles.courseDescription} numberOfLines={2}>
-          {item.description || 'No description'}
+          {item.description || 'Sem descrição'}
         </Text>
 
         <View style={styles.statusContainer}>
           <Text style={item.published ? styles.publishedBadge : styles.draftBadge}>
-            {item.published ? 'Published' : 'Draft'}
+            {item.published ? 'Publicado' : 'Rascunho'}
           </Text>
         </View>
       </View>
@@ -176,14 +160,14 @@ export default function CourseListScreen({ navigation }: any) {
           style={[styles.button, styles.editButton]}
           onPress={() => editCourse(item.id)}
         >
-          <Text style={styles.buttonText}>Edit</Text>
+          <Text style={styles.buttonText}>Editar</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
           onPress={() => deleteCourse(item.id)}
         >
-          <Text style={styles.buttonText}>Delete</Text>
+          <Text style={styles.buttonText}>Eliminar</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -192,23 +176,23 @@ export default function CourseListScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Courses</Text>
+        <Text style={styles.headerTitle}>Meus Cursos</Text>
         <TouchableOpacity
           style={styles.createButton}
           onPress={createNewCourse}
         >
-          <Text style={styles.createButtonText}>+ Create Course</Text>
+          <Text style={styles.createButtonText}>+ Criar Curso</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4285F4" />
+          <ActivityIndicator size="large" color="#007BFF" />
         </View>
       ) : courses.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
-            {profile ? "You don't have any courses yet. Click \"Create Course\" to get started." : "Loading profile..."}
+            {profile ? "Ainda não tens cursos. Clica em 'Criar Curso' para começares." : "A carregar perfil..."}
           </Text>
         </View>
       ) : (
@@ -224,33 +208,36 @@ export default function CourseListScreen({ navigation }: any) {
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8F9FA', // Updated background
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF', // White header background
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#DEE2E6', // Lighter border
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '600', // Bolder
+    color: '#212529', // Darker text
   },
   createButton: {
-    backgroundColor: '#4285F4',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 4,
+    backgroundColor: '#007BFF', // Primary blue
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8, // More rounded
   },
   createButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '500', // Medium weight
+    fontSize: 15,
   },
   loadingContainer: {
     flex: 1,
@@ -265,7 +252,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: '#6C757D', // Softer gray
     textAlign: 'center',
   },
   list: {
@@ -273,61 +260,66 @@ const styles = StyleSheet.create({
   },
   courseItem: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12, // More rounded
     marginBottom: 16,
     padding: 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 1.41,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08, // Softer shadow
+        shadowRadius: 6,
       },
       android: {
-        elevation: 2,
+        elevation: 3, // Slightly more elevation
       },
       web: {
-        boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.08)', // Softer shadow for web
       }
     }),
   },
   courseInfo: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   courseTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 6,
   },
   courseDescription: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    color: '#6C757D',
+    marginBottom: 12,
+    lineHeight: 20,
   },
   statusContainer: {
     flexDirection: 'row',
   },
   publishedBadge: {
     fontSize: 12,
-    color: '#34a853',
-    backgroundColor: '#e6f4ea',
-    paddingVertical: 2,
+    color: '#28A745', // Success green text
+    backgroundColor: '#D4EDDA', // Light success green background
+    paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 12,
+    borderRadius: 16, // Pill shape
     overflow: 'hidden',
+    fontWeight: '500',
   },
   draftBadge: {
     fontSize: 12,
-    color: '#f29900',
-    backgroundColor: '#fef7e0',
-    paddingVertical: 2,
+    color: '#FFC107', // Warning yellow text
+    backgroundColor: '#FFF3CD', // Light warning yellow background
+    paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 12,
+    borderRadius: 16, // Pill shape
     overflow: 'hidden',
+    fontWeight: '500',
   },
   courseActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    marginTop: 8,
   },
   button: {
     paddingVertical: 6,
@@ -338,12 +330,12 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 13,
   },
   editButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#007BFF', // Primary blue
   },
   deleteButton: {
-    backgroundColor: '#ea4335',
+    backgroundColor: '#DC3545', // Danger red
   },
 });
