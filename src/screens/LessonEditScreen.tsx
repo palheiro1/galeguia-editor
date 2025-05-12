@@ -1,13 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 
+// Define the type for the route params
+type LessonEditScreenRouteParams = {
+  moduleId: string; // Assuming moduleId is also passed as a param
+  lessonId?: string; // lessonId is optional for creating new lessons
+};
+
 const EditLessonScreen = () => {
   const navigation = useNavigation();
-  const route = useRoute();
-  const { lessonId } = route.params || {};
+  // Explicitly type the route using RouteProp
+  const route = useRoute<RouteProp<{ params: LessonEditScreenRouteParams }, 'params'>>();
+  // Safely access lessonId and moduleId from route.params
+  const { lessonId, moduleId } = route.params || {};
 
   const [title, setTitle] = useState('');
   const [textContent, setTextContent] = useState('');
@@ -62,22 +70,28 @@ const EditLessonScreen = () => {
     }
 
     const fileName = file.fileName || `media.${file.uri.split('.').pop()}`;
-    const fileType = file.type || 'application/octet-stream';
+    // Ensure fileType is correctly determined or default to a generic one if needed by Supabase
+    const fileType = file.mimeType || file.type || 'application/octet-stream';
+
+    // Convert URI to Blob for FormData
+    const response = await fetch(file.uri);
+    const blob = await response.blob();
 
     const formData = new FormData();
-    formData.append('file', {
-      uri: file.uri,
-      name: fileName,
-      type: fileType,
-    });
+    // Append the blob with filename and type
+    formData.append('file', blob, fileName);
 
     try {
-      const filePath = `${Date.now()}.${file.uri.split('.').pop()}`;
+      const filePath = `${Date.now()}-${fileName}`;
 
       const { data, error } = await supabase.storage
         .from('course-content')
         .upload(filePath, formData, {
+          // contentType is often inferred by Supabase from the FormData, 
+          // but can be specified if issues arise. 
+          // Forcing it here based on determined fileType.
           contentType: fileType,
+          upsert: false // Default is false, can be true if you want to overwrite
         });
 
       if (error) {

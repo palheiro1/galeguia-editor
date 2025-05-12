@@ -27,7 +27,7 @@ const TopBar = () => {
     navigation.navigate('ProfileEdit');
   };
 
-  const displayName = profile.username || profile.email?.split('@')[0] || 'User';
+  const displayName = profile.username || 'User';
   const displayRole = profile.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : 'No Role';
 
   return (

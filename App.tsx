@@ -108,7 +108,6 @@ function MainContent() {
             headerStyle: { backgroundColor: '#FFFFFF' },
             headerTintColor: '#212529',
             headerTitleStyle: { fontWeight: '600', fontSize: 18 },
-            headerBackTitleVisible: false,
           }}
         >
           <Stack.Screen
