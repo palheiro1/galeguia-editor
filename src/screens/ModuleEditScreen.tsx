@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { useIsFocused } from '@react-navigation/native'; // Add this import
 
 // Definição do tipo do módulo
 type Module = {
@@ -32,6 +33,7 @@ type Lesson = {
 export default function ModuleEditScreen({ route, navigation }: any) {
   const { courseId, moduleId } = route.params;
   const isNewModule = moduleId === null;
+  const isFocused = useIsFocused(); // Add this line
 
   const [title, setTitle] = useState('');
   const [position, setPosition] = useState(0);
@@ -47,7 +49,14 @@ export default function ModuleEditScreen({ route, navigation }: any) {
     } else {
       getNextPositionNumber();
     }
-  }, [moduleId]);
+  }, [moduleId]); // Keep original dependencies
+
+  // Refetch lessons when the screen is focused
+  useEffect(() => {
+    if (isFocused && !isNewModule && moduleId) {
+      fetchLessons();
+    }
+  }, [isFocused, moduleId]); // Add isFocused and moduleId as dependencies
 
   const fetchModuleData = async () => {
     try {
