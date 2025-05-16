@@ -266,33 +266,70 @@ export default function LessonEditScreen() {
   const handleDelete = async () => {
     if (!lessonId || !courseId || !moduleId) {
         Alert.alert('Erro', 'Não é possível excluir a lição devido a IDs em falta.');
+        console.error('handleDelete (Lesson): Missing IDs.', { lessonId, courseId, moduleId });
         return;
     }
-    Alert.alert('Confirmar eliminação', 'Tens a certeza de que queres eliminar esta lição?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          setIsLoading(true);
-          try {
-            // Optional: Delete associated pages first if desired
-            // const { error: deletePagesError } = await supabase.from('pages').delete().eq('lesson_id', lessonId);
-            // if (deletePagesError) throw deletePagesError;
 
-            const { error } = await supabase.from('lessons').delete().eq('id', lessonId);
-            if (error) throw error;
-            Alert.alert('Sucesso', 'Lição eliminada com sucesso.');
-            navigation.navigate('ModuleEdit', { courseId: courseId, moduleId: moduleId, refresh: true });
-          } catch (error: any) {
-            Alert.alert('Erro ao Eliminar', error.message || 'Não foi possível eliminar a lição.');
-            console.error('Error deleting lesson:', error);
-          } finally {
-            setIsLoading(false);
-          }
-        },
-      },
-    ]);
+    const performDeleteLesson = async () => {
+      console.log("performDeleteLesson called. Attempting to delete lesson with ID:", lessonId);
+      setIsLoading(true);
+      try {
+        // First, delete all pages associated with this lesson
+        const { error: pagesError } = await supabase
+          .from('pages')
+          .delete()
+          .eq('lesson_id', lessonId);
+
+        if (pagesError) {
+          console.error('Error deleting pages for lesson:', pagesError);
+          Alert.alert('Erro', 'Falha ao excluir as páginas da lição.');
+          // Decide if you want to stop or continue. For now, we'll stop.
+          setIsLoading(false);
+          return;
+        }
+
+        // Then, delete the lesson itself
+        const { error: lessonError } = await supabase
+          .from('lessons')
+          .delete()
+          .eq('id', lessonId);
+
+        if (lessonError) {
+          console.error('Error deleting lesson:', lessonError);
+          Alert.alert('Erro', `Falha ao excluir lição: ${lessonError.message}`);
+        } else {
+          Alert.alert('Sucesso', 'Lição e suas páginas foram excluídas com sucesso!');
+          navigation.navigate('ModuleEdit', { courseId: courseId, moduleId: moduleId, refresh: true });
+        }
+      } catch (error: any) {
+        Alert.alert('Erro ao Excluir', error.message || 'Ocorreu um erro desconhecido.');
+        console.error('General error deleting lesson and its pages:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Tens a certeza de que queres eliminar esta lição? Isso também excluirá todas as páginas desta lição.')) {
+        await performDeleteLesson();
+      } else {
+        console.log('Lesson deletion cancelled by user (web confirm).');
+      }
+    } else {
+      Alert.alert(
+        'Confirmar eliminação',
+        'Tens a certeza de que queres eliminar esta lição? Isso também excluirá todas as páginas desta lição.',
+        [
+          { text: 'Cancelar', style: 'cancel', onPress: () => console.log('Lesson deletion cancelled by user (native alert).') },
+          {
+            text: 'Eliminar',
+            style: 'destructive',
+            onPress: performDeleteLesson,
+          },
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
   const renderPageItem = ({ item }: { item: Page }) => (

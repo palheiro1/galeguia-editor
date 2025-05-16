@@ -74,12 +74,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Set up auth state management
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      if (initialSession) {
         refreshProfile();
       }
       setIsLoading(false);
+    }).catch(error => {
+      console.error("Error fetching initial session in AuthContext:", error);
+      setSession(null);
+      setProfile(null);
+      setIsLoading(false); // Ensure loading state is updated even on error
     });
 
     // Set up listener for auth state changes

@@ -8,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useIsFocused } from '@react-navigation/native'; // Add this import
@@ -177,38 +178,100 @@ export default function ModuleEditScreen({ route, navigation }: any) {
   };
 
   const deleteModule = async () => {
-    try {
+    if (!moduleId) {
+      Alert.alert('Erro', 'ID do módulo não encontrado. Não é possível eliminar.');
+      console.error('deleteModule: moduleId is missing.');
+      return;
+    }
+
+    const performDeleteModule = async () => {
+      console.log("performDeleteModule called. Attempting to delete module with ID:", moduleId);
+      setIsLoading(true);
+      try {
+        // First, delete all pages associated with lessons of this module (if necessary and not handled by CASCADE)
+        // Then, delete all lessons associated with this module
+        const { data: lessonsToDelete, error: lessonsError } = await supabase
+          .from('lessons')
+          .select('id')
+          .eq('module_id', moduleId);
+
+        if (lessonsError) {
+          console.error('Error fetching lessons for deletion:', lessonsError);
+          Alert.alert('Erro', 'Falha ao buscar lições para exclusão.');
+          setIsLoading(false);
+          return;
+        }
+
+        if (lessonsToDelete && lessonsToDelete.length > 0) {
+          for (const lesson of lessonsToDelete) {
+            // Delete pages for each lesson
+            const { error: pagesDeleteError } = await supabase
+              .from('pages')
+              .delete()
+              .eq('lesson_id', lesson.id);
+            if (pagesDeleteError) {
+              console.error(`Error deleting pages for lesson ${lesson.id}:`, pagesDeleteError);
+              // Decide if you want to stop or continue
+            }
+          }
+          // Now delete the lessons
+          const { error: lessonsDeleteError } = await supabase
+            .from('lessons')
+            .delete()
+            .eq('module_id', moduleId);
+
+          if (lessonsDeleteError) {
+            console.error('Error deleting lessons:', lessonsDeleteError);
+            Alert.alert('Erro', 'Falha ao excluir as lições do módulo.');
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // Finally, delete the module itself
+        const { error: moduleDeleteError } = await supabase
+          .from('modules')
+          .delete()
+          .eq('id', moduleId);
+
+        if (moduleDeleteError) {
+          console.error('Error deleting module:', moduleDeleteError);
+          Alert.alert('Erro', `Falha ao excluir módulo: ${moduleDeleteError.message}`);
+        } else {
+          Alert.alert('Sucesso', 'Módulo e suas lições foram excluídos com sucesso');
+          navigation.navigate('CourseEdit', {
+            courseId,
+            refresh: true
+          });
+        }
+      } catch (error) {
+        console.error('Erro geral ao excluir módulo e suas dependências:', error);
+        Alert.alert('Erro', 'Ocorreu uma falha inesperada ao excluir o módulo.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Você tem certeza que deseja excluir este módulo? Isso também excluirá todas as lições e páginas deste módulo.')) {
+        await performDeleteModule();
+      } else {
+        console.log('Module deletion cancelled by user (web confirm).');
+      }
+    } else {
       Alert.alert(
         'Confirmar Exclusão',
-        'Você tem certeza que deseja excluir este módulo? Isso também excluirá todas as lições deste módulo.',
+        'Você tem certeza que deseja excluir este módulo? Isso também excluirá todas as lições e páginas deste módulo.',
         [
-          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Cancelar', style: 'cancel', onPress: () => console.log('Module deletion cancelled by user (native alert).') },
           {
             text: 'Excluir',
             style: 'destructive',
-            onPress: async () => {
-              setIsLoading(true);
-
-              const { error } = await supabase
-                .from('modules')
-                .delete()
-                .eq('id', moduleId);
-
-              if (error) throw error;
-
-              Alert.alert('Sucesso', 'Módulo excluído com sucesso');
-              navigation.navigate('CourseEdit', {
-                courseId,
-                refresh: true
-              });
-            }
+            onPress: performDeleteModule,
           }
-        ]
+        ],
+        { cancelable: true }
       );
-    } catch (error) {
-      console.error('Erro ao excluir módulo:', error);
-      Alert.alert('Erro', 'Falha ao excluir módulo');
-      setIsLoading(false);
     }
   };
 
@@ -217,11 +280,13 @@ export default function ModuleEditScreen({ route, navigation }: any) {
       Alert.alert('Informação', 'Por favor, salve o módulo primeiro antes de adicionar lições');
       return;
     }
-    navigation.navigate('LessonEdit', { moduleId, lessonId: null });
+    // Pass courseId when navigating to LessonEdit for a new lesson
+    navigation.navigate('LessonEdit', { courseId, moduleId, lessonId: null });
   };
 
   const editLesson = (lessonId: string) => {
-    navigation.navigate('LessonEdit', { moduleId, lessonId });
+    // Pass courseId when navigating to LessonEdit for an existing lesson
+    navigation.navigate('LessonEdit', { courseId, moduleId, lessonId });
   };
 
   const renderLessonItem = ({ item }: { item: Lesson }) => (

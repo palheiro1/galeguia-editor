@@ -39,25 +39,21 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
     }
 
     // For Netlify and other web hosts, detect auth in URL
-    const handleAuthFromUrl = async () => {
+    const processAuthRedirect = async () => {
       try {
-        // This will parse the URL for auth info, if present
-        await supabase.auth.getSession();
-        
-        // Remove any hash fragments that may contain auth tokens
         if (window.location.hash && window.location.hash.includes('access_token')) {
-          // Create clean URL without the hash fragments
           const cleanUrl = window.location.href.split('#')[0];
           window.history.replaceState(null, '', cleanUrl);
+          await supabase.auth.getSession();
         }
       } catch (error) {
-        console.error("Error handling auth from URL:", error);
+        console.error("Error processing auth redirect in AuthRedirect:", error);
+      } finally {
+        setAuthChecked(true);
       }
-      
-      setAuthChecked(true);
     };
-    
-    handleAuthFromUrl();
+
+    processAuthRedirect();
   }, []);
   
   if (!authChecked && Platform.OS === 'web') {

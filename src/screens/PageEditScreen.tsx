@@ -164,23 +164,47 @@ const EditPageScreen = () => {
   };
 
   const handleDelete = async () => {
-    if (!pageId) return;
-    Alert.alert('Confirmar eliminação', 'Tens a certeza de que queres eliminar esta página?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('pages').delete().eq('id', pageId);
-          if (error) {
-            Alert.alert('Erro', `Erro ao eliminar a página: ${error.message}`);
-          } else {
-            Alert.alert('Sucesso', 'Página eliminada com sucesso!');
-            navigation.goBack();
-          }
-        },
-      },
-    ]);
+    console.log('handleDelete called. pageId:', pageId);
+    if (!pageId) {
+      console.error('handleDelete: pageId is missing, cannot delete.');
+      Alert.alert('Erro', 'ID da página não encontrado. Não é possível eliminar.');
+      return;
+    }
+
+    const performDelete = async () => {
+      console.log("performDelete called. Attempting to delete page with ID:", pageId);
+      const { data, error } = await supabase.from('pages').delete().eq('id', pageId);
+      console.log('Supabase delete response - data:', data); 
+      console.log('Supabase delete response - error:', error); 
+      if (error) {
+        Alert.alert('Erro', `Erro ao eliminar a página: ${error.message}`);
+      } else {
+        Alert.alert('Sucesso', 'Página eliminada com sucesso!');
+        navigation.goBack();
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Tens a certeza de que queres eliminar esta página?')) {
+        await performDelete();
+      } else {
+        console.log('Deletion cancelled by user (web confirm).');
+      }
+    } else {
+      Alert.alert(
+        'Confirmar eliminação',
+        'Tens a certeza de que queres eliminar esta página?',
+        [
+          { text: 'Cancelar', style: 'cancel', onPress: () => console.log('Deletion cancelled by user (native alert).') },
+          {
+            text: 'Eliminar',
+            style: 'destructive',
+            onPress: performDelete,
+          },
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
   return (
