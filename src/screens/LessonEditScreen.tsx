@@ -1,343 +1,483 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView, Platform } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Platform, FlatList } from 'react-native';
+import { supabase } from '../lib/supabase'; // Ensure this path is correct
+import { useRoute, useNavigation, useIsFocused, NavigationProp } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
 
-// Define the type for the route params
-type LessonEditScreenRouteParams = {
-  moduleId: string; // Assuming moduleId is also passed as a param
-  lessonId?: string; // lessonId is optional for creating new lessons
+// Define the types for route params and navigation
+type RootStackParamList = {
+  CourseList: undefined;
+  CourseEdit: { courseId: string | null; refresh?: boolean };
+  ModuleEdit: { courseId: string; moduleId: string | null; refresh?: boolean };
+  LessonEdit: { moduleId: string; lessonId: string | null; courseId: string; refresh?: boolean }; // Added courseId
+  PageEdit: { lessonId: string; pageId?: string | null; refresh?: boolean };
+  ProfileEdit: undefined;
 };
 
-const EditLessonScreen = () => {
-  const navigation = useNavigation();
-  // Explicitly type the route using RouteProp
-  const route = useRoute<RouteProp<{ params: LessonEditScreenRouteParams }, 'params'>>();
-  // Safely access lessonId and moduleId from route.params
-  const { lessonId, moduleId } = route.params || {};
+type LessonEditScreenNavigationProp = NavigationProp<RootStackParamList, 'LessonEdit'>;
+
+type LessonEditScreenRouteParams = {
+  moduleId: string;
+  lessonId?: string | null;
+  courseId: string; // Added courseId
+  refresh?: boolean;
+};
+
+// Define the type for a Page item
+type Page = {
+  id: string;
+  title: string;
+  position: number;
+};
+
+export default function LessonEditScreen() {
+  const route = useRoute();
+  const navigation = useNavigation<LessonEditScreenNavigationProp>();
+  const isFocused = useIsFocused();
+  const { moduleId, lessonId, courseId } = route.params as LessonEditScreenRouteParams; // Added courseId
 
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState(''); // Renamed from textContent
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [position, setPosition] = useState<number>(0); // Added for lesson position
-  const [lessonType, setLessonType] = useState<string>('text'); // Added for lesson type, e.g., 'text', 'video'
+  const [content, setContent] = useState('');
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [lessonType, setLessonType] = useState('');
+  const [position, setPosition] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [pages, setPages] = useState<Page[]>([]);
 
-  useEffect(() => {
-    if (lessonId) {
-      loadLessonData();
-    } else if (moduleId) { // If creating a new lesson, fetch the next position
-      fetchNextLessonPosition(moduleId);
-    }
-    // If creating a new lesson and moduleId is not present, it's an issue.
-    // However, moduleId should be passed for new lessons too, to associate them.
-  }, [lessonId, moduleId]);
-
-  const fetchNextLessonPosition = async (currentModuleId: string) => {
-    const { data, error } = await supabase
-      .from('lessons')
-      .select('position')
-      .eq('module_id', currentModuleId)
-      .order('position', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found, which is fine
-      console.error('Error fetching next lesson position:', error);
-      Alert.alert('Erro', 'Não foi possível determinar a próxima posição para a lição.');
-      setPosition(1); // Default to 1 on error
-    } else if (data) {
-      setPosition(data.position + 1);
-    } else {
-      setPosition(1); // First lesson in the module
-    }
-  };
-
-  const loadLessonData = async () => {
-    const { data, error } = await supabase
-      .from('lessons')
-      .select('*')
-      .eq('id', lessonId)
-      .single();
-
-    if (error) {
-      Alert.alert('Erro', 'Erro ao carregar os dados da lição');
-    } else if (data) {
-      setTitle(data.title || '');
-      setContent(data.content || ''); // Use content, handle null
-      setMediaUrl(data.media_url || ''); // Handle null
-      setPosition(data.position || 0); // Load position, default to 0 if null
-      setLessonType(data.type || 'text'); // Load type, default to 'text' if null
-    }
-  };
-
-  const uploadMedia = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) {
-      Alert.alert('Erro', 'Utilizador não autenticado.');
-      return;
-    }
-
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Erro', 'Permissão negada para aceder à galeria');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      allowsEditing: true,
-    });
-
-    if (result.canceled) return;
-
-    const file = result.assets[0];
-    if (!file) {
-      Alert.alert('Erro', 'Erro ao selecionar o ficheiro de vídeo/áudio');
-      return;
-    }
-
-    const fileName = file.fileName || `media.${file.uri.split('.').pop()}`;
-    // Ensure fileType is correctly determined or default to a generic one if needed by Supabase
-    const fileType = file.mimeType || file.type || 'application/octet-stream';
-
-    // Convert URI to Blob for FormData
-    const response = await fetch(file.uri);
-    const blob = await response.blob();
-
-    const formData = new FormData();
-    // Append the blob with filename and type
-    formData.append('file', blob, fileName);
+  const fetchNextLessonPosition = useCallback(async () => {
+    if (!moduleId) return;
 
     try {
-      const filePath = `${Date.now()}-${fileName}`;
+      const { data, error } = await supabase
+        .from('lessons')
+        .select('position')
+        .eq('module_id', moduleId)
+        .order('position', { ascending: false })
+        .limit(1);
 
-      const { data, error } = await supabase.storage
-        .from('course-content')
-        .upload(filePath, formData, {
-          // contentType is often inferred by Supabase from the FormData, 
-          // but can be specified if issues arise. 
-          // Forcing it here based on determined fileType.
-          contentType: fileType,
-          upsert: false // Default is false, can be true if you want to overwrite
-        });
+      if (error) throw error;
 
-      if (error) {
-        if (error.message.includes('The resource was not found')) {
-          Alert.alert(
-            'Erro',
-            "O armazenamento 'course-content' não foi encontrado. Verifique a configuração do Supabase."
-          );
-        } else if (error.message.includes('Policy')) {
-          Alert.alert(
-            'Erro',
-            'A política de armazenamento recusou o carregamento. Verifique as políticas RLS do armazenamento.'
-          );
-        } else {
-          Alert.alert('Erro', 'Falha ao carregar o ficheiro');
+      if (data && data.length > 0) {
+        setPosition(String(data[0].position + 1));
+      } else {
+        setPosition('1');
+      }
+    } catch (error) {
+      console.error('Error fetching next lesson position:', error);
+      setPosition('1'); // Default to 1 if error
+    }
+  }, [moduleId]);
+
+  const loadLessonData = useCallback(async () => {
+    if (!lessonId) {
+      fetchNextLessonPosition();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('lessons')
+        .select('*, modules(course_id)') // Ensure you select all necessary fields
+        .eq('id', lessonId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setTitle(data.title || '');
+        setContent(data.content || '');
+        setMediaUrl(data.media_url || null);
+        setLessonType(data.type || '');
+        setPosition(String(data.position) || ''); // Convert to string for input
+      } else {
+        // If no data found for lessonId, perhaps it's a new lesson or an error
+        // If it's a new lesson, fetchNextLessonPosition should have been called
+        // If it's an error, it should be caught by the catch block
+        if (!lessonId) { // Explicitly check if it's a new lesson scenario
+          fetchNextLessonPosition();
         }
+      }
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar os dados da lição.');
+      console.error('Error loading lesson data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [lessonId, fetchNextLessonPosition]);
+
+  const loadPagesData = useCallback(async () => {
+    if (!lessonId) return;
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('pages')
+        .select('id, title, position')
+        .eq('lesson_id', lessonId)
+        .order('position', { ascending: true });
+
+      if (error) throw error;
+      setPages(data || []);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar as páginas.');
+      console.error('Error loading pages:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [lessonId]);
+
+  useEffect(() => {
+    if (isFocused) {
+      loadLessonData();
+      if (lessonId) {
+        loadPagesData();
+      }
+    } else {
+      // When the screen is not focused, if it's a new lesson, fetch position
+      if (!lessonId) {
+        fetchNextLessonPosition();
+        setPages([]); // Clear pages for a new lesson
+      }
+    }
+  }, [isFocused, lessonId, loadLessonData, loadPagesData, fetchNextLessonPosition]);
+
+  const handlePickMedia = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*', // Allow all file types
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        console.log('Document picking cancelled');
         return;
       }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('course-content')
-        .getPublicUrl(filePath);
+      if (result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const { uri, name, mimeType } = asset;
 
-      if (!publicUrlData?.publicUrl) {
-        Alert.alert(
-          'Erro',
-          'Ficheiro carregado, mas não foi possível obter a URL pública. Verifique as políticas do armazenamento.'
-        );
-        return;
+        if (!uri) {
+          Alert.alert('Erro', 'Não foi possível obter o URI do ficheiro.');
+          return;
+        }
+
+        setIsUploading(true);
+        const fileName = name || `media.${uri.split('.').pop()}`;
+        const actualMimeType = mimeType || 'application/octet-stream';
+
+        // Fetch the file as a blob
+        const response = await fetch(uri);
+        const blob = await response.blob();
+
+        const filePath = `${Date.now()}-${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('course-content') // Make sure this bucket exists and has correct policies
+          .upload(filePath, blob, {
+            contentType: actualMimeType,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('Error uploading file:', uploadError);
+          Alert.alert('Erro de Upload', uploadError.message);
+          setIsUploading(false);
+          return;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from('course-content')
+          .getPublicUrl(filePath);
+
+        if (!publicUrlData?.publicUrl) {
+          Alert.alert('Erro', 'Ficheiro carregado, mas não foi possível obter a URL pública.');
+        } else {
+          setMediaUrl(publicUrlData.publicUrl);
+          Alert.alert('Sucesso', 'Mídia carregada com sucesso!');
+        }
+      } else {
+        Alert.alert('Erro', 'Nenhum ficheiro foi selecionado.');
       }
-
-      setMediaUrl(publicUrlData.publicUrl);
-    } catch (e) {
-      Alert.alert('Erro', 'Ocorreu um erro inesperado durante o carregamento.');
+    } catch (err: any) {
+      console.error('Error picking or uploading media:', err);
+      Alert.alert('Erro de Mídia', err.message || 'Ocorreu um erro ao processar a mídia.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!title) {
-      Alert.alert('Erro', 'O título é obrigatório');
+    if (!title.trim()) {
+      Alert.alert('Erro', 'O título da lição é obrigatório.');
+      return;
+    }
+    if (!moduleId) {
+      Alert.alert('Erro', 'ID do módulo não encontrado. Não é possível salvar a lição.');
+      return;
+    }
+    if (!courseId) { // Check for courseId as it's needed for navigation back
+      Alert.alert('Erro', 'ID do curso não encontrado. Não é possível salvar a lição.');
       return;
     }
 
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) {
-      Alert.alert('Erro', 'Utilizador não autenticado.');
+    const currentPosition = parseInt(position, 10);
+    if (isNaN(currentPosition) || currentPosition <= 0) {
+      Alert.alert('Erro', 'A posição deve ser um número positivo.');
       return;
     }
 
-    if (!moduleId && !lessonId) { // If creating a new lesson, moduleId is essential
-      Alert.alert('Erro', 'ID do módulo não fornecido. Não é possível criar a lição.');
-      return;
-    }
-    
-    // Ensure moduleId is available if we are creating a new lesson or even if updating (though less likely to change)
-    // For existing lessons, moduleId would have been part of its existing data, but we use the one from params
-    // if we intend to allow moving lessons between modules through this screen (which might be complex).
-    // For now, assume moduleId from params is the target module_id.
-    const currentModuleId = moduleId; 
-    if (!currentModuleId) {
-        Alert.alert('Erro', 'ID do módulo é inválido ou não fornecido.');
-        return;
-    }
+    setIsLoading(true);
+    try {
+      let lessonData: any = {
+        module_id: moduleId,
+        title: title.trim(),
+        content: content,
+        media_url: mediaUrl,
+        type: lessonType.trim(),
+        position: currentPosition,
+      };
 
-    const payload = {
-      title,
-      content: content, // Changed from text_content
-      media_url: mediaUrl,
-      module_id: currentModuleId, // Added moduleId
-      position: position,       // Added position
-      type: lessonType,         // Added type
-      // user_id is removed as it's not in the lessons table schema
-      // id, created_at, updated_at are handled by Supabase
-    };
+      let response;
+      if (lessonId) {
+        // Update existing lesson
+        response = await supabase.from('lessons').update(lessonData).eq('id', lessonId).select().single();
+      } else {
+        // Create new lesson
+        response = await supabase.from('lessons').insert(lessonData).select().single();
+      }
 
-    let response;
-    if (lessonId) {
-      response = await supabase
-        .from('lessons')
-        .update(payload)
-        .eq('id', lessonId);
-    } else {
-      // For insert, Supabase will generate id, created_at, updated_at
-      response = await supabase.from('lessons').insert(payload);
-    }
+      const { data: savedLesson, error } = response;
 
-    if (response.error) {
-      Alert.alert('Erro', 'Erro ao guardar a lição');
-    } else {
-      Alert.alert(
-        'Sucesso',
-        lessonId ? 'Lição atualizada com sucesso' : 'Lição criada com sucesso'
-      );
-      navigation.goBack();
+      if (error) throw error;
+
+      Alert.alert('Sucesso', `Lição ${lessonId ? 'atualizada' : 'criada'} com sucesso!`);
+      navigation.navigate('ModuleEdit', { courseId: courseId, moduleId: moduleId, refresh: true }); // Pass courseId here
+
+    } catch (error: any) {
+      Alert.alert('Erro ao Salvar', error.message || 'Ocorreu um erro desconhecido.');
+      console.error('Error saving lesson:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDelete = async () => {
+    if (!lessonId || !courseId || !moduleId) {
+        Alert.alert('Erro', 'Não é possível excluir a lição devido a IDs em falta.');
+        return;
+    }
     Alert.alert('Confirmar eliminação', 'Tens a certeza de que queres eliminar esta lição?', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar',
         style: 'destructive',
         onPress: async () => {
-          const { error } = await supabase.from('lessons').delete().eq('id', lessonId);
-          if (error) {
-            Alert.alert('Erro', 'Erro ao eliminar a lição');
-          } else {
-            navigation.goBack();
+          setIsLoading(true);
+          try {
+            // Optional: Delete associated pages first if desired
+            // const { error: deletePagesError } = await supabase.from('pages').delete().eq('lesson_id', lessonId);
+            // if (deletePagesError) throw deletePagesError;
+
+            const { error } = await supabase.from('lessons').delete().eq('id', lessonId);
+            if (error) throw error;
+            Alert.alert('Sucesso', 'Lição eliminada com sucesso.');
+            navigation.navigate('ModuleEdit', { courseId: courseId, moduleId: moduleId, refresh: true });
+          } catch (error: any) {
+            Alert.alert('Erro ao Eliminar', error.message || 'Não foi possível eliminar a lição.');
+            console.error('Error deleting lesson:', error);
+          } finally {
+            setIsLoading(false);
           }
         },
       },
     ]);
   };
 
+  const renderPageItem = ({ item }: { item: Page }) => (
+    <TouchableOpacity 
+      style={styles.pageItem}
+      onPress={() => navigation.navigate('PageEdit', { lessonId: lessonId!, pageId: item.id, refresh: true })}
+    >
+      <Text style={styles.pageTitle}>{item.position}. {item.title}</Text>
+    </TouchableOpacity>
+  );
+
+  if (isLoading && !isUploading && !isFocused && lessonId) { // Only show full screen loader if loading existing lesson data initially
+    return (
+      <View style={styles.centeredLoading}>
+        <ActivityIndicator size="large" color="#007bff" />
+        <Text>Carregando dados da lição...</Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
-      <Text style={styles.label}>Título:</Text>
+    <ScrollView 
+      style={styles.scrollView}
+      contentContainerStyle={Platform.OS === 'web' ? styles.webContainer : styles.container}
+    >
+      <Text style={styles.label}>Título da Lição</Text>
       <TextInput
+        style={styles.input}
         value={title}
         onChangeText={setTitle}
-        style={styles.input}
+        placeholder="Ex: Introdução ao Curso"
       />
-
-      <Text style={styles.label}>Posição da Lição:</Text>
+      
+      <Text style={styles.label}>Conteúdo</Text>
       <TextInput
-        value={position ? position.toString() : '0'} // Ensure position is not null/undefined for toString()
-        onChangeText={(text) => setPosition(parseInt(text, 10) || 0)} // Ensure text is parsed to int, default to 0
-        style={styles.input}
-        keyboardType="numeric"
-      />
-
-      <Text style={styles.label}>Resumo:</Text>
-      <TextInput
-        value={content} // Changed from textContent
-        onChangeText={setContent} // Changed from setTextContent
-        style={styles.textArea}
+        style={[styles.input, styles.textArea]}
+        value={content}
+        onChangeText={setContent}
+        placeholder="Escreva o conteúdo da lição aqui..."
         multiline
       />
 
-      <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSave}>
-        <Text style={styles.buttonText}>Guardar Lição</Text>
-      </TouchableOpacity>
+      <Text style={styles.label}>Tipo de Lição</Text>
+      <TextInput
+        style={styles.input}
+        value={lessonType}
+        onChangeText={setLessonType}
+        placeholder="Ex: texto, vídeo, quiz"
+      />
+
+      <Text style={styles.label}>Posição</Text>
+      <TextInput
+        style={styles.input}
+        value={position}
+        onChangeText={setPosition}
+        placeholder="Ex: 1, 2, 3..."
+        keyboardType="numeric"
+      />
+
+      <View style={styles.mediaContainer}>
+        <Button title={mediaUrl ? "Alterar Mídia" : "Adicionar Mídia (Opcional)"} onPress={handlePickMedia} color="#007bff" />
+        {isUploading && <ActivityIndicator size="small" color="#007bff" style={{ marginLeft: 10 }} />}
+        {mediaUrl && !isUploading && <Text style={styles.mediaText}>Mídia carregada: {mediaUrl.split('/').pop()}</Text>}
+      </View>
+
+      <View style={styles.buttonContainer}>
+        <Button title="Salvar Lição" onPress={handleSave} disabled={isLoading || isUploading} color="#28a745" />
+      </View>
 
       {lessonId && (
-        <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={handleDelete}>
-          <Text style={styles.buttonText}>Eliminar Lição</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <Button title="Excluir Lição" onPress={handleDelete} disabled={isLoading || isUploading} color="#dc3545" />
+        </View>
+      )}
+
+      {/* Pages Section */}
+      {lessonId && (
+        <View style={styles.pagesSection}>
+          <Text style={styles.sectionTitle}>Páginas da Lição</Text>
+          {isLoading && pages.length === 0 && <ActivityIndicator size="small" color="#007bff" />}
+          <FlatList
+            data={pages}
+            renderItem={renderPageItem}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={<Text style={styles.emptyListText}>Nenhuma página adicionada ainda.</Text>}
+          />
+          <View style={styles.addPageButtonContainer}>
+            <Button 
+              title="Adicionar Nova Página"
+              onPress={() => navigation.navigate('PageEdit', { lessonId: lessonId!, pageId: null, refresh: true })}
+              color="#17a2b8"
+              disabled={!lessonId || isLoading || isUploading} 
+            />
+          </View>
+        </View>
       )}
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-    ...(Platform.OS === 'web' && { /* Consider web-specific styling here if needed, but flex: 1 is key */ }),
+    backgroundColor: '#f8f9fa',
   },
   container: {
     padding: 20,
-    ...(Platform.OS === 'web' && { flexGrow: 1 }), // Ensure content can grow on web
+    paddingBottom: 50, 
+  },
+  webContainer: {
+    padding: 20,
+    paddingBottom: 50, 
+    flexGrow: 1, 
   },
   label: {
     fontSize: 16,
-    marginBottom: 6,
-    fontWeight: '500',
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#495057',
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#CED4DA',
-    borderRadius: 8,
-    marginBottom: 16,
+    borderColor: '#ced4da',
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 15,
     fontSize: 16,
-    color: '#212529',
   },
   textArea: {
-    height: 150,
+    minHeight: 120,
     textAlignVertical: 'top',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#CED4DA',
-    borderRadius: 8,
-    marginBottom: 16,
-    fontSize: 16,
-    color: '#212529',
   },
-  button: {
-    paddingVertical: 14,
-    borderRadius: 8,
+  mediaContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 20,
+    marginTop: 10,
   },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  uploadButton: {
-    backgroundColor: '#6C757D', // Secondary gray
-  },
-  saveButton: {
-    backgroundColor: '#007BFF', // Primary blue
-  },
-  deleteButton: {
-    backgroundColor: '#DC3545', // Danger red
-  },
-  mediaUrlText: {
+  mediaText: {
+    marginLeft: 10,
     fontSize: 14,
-    color: '#6C757D',
-    marginBottom: 16,
+    color: '#6c757d',
+  },
+  buttonContainer: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  pagesSection: {
+    marginTop: 30,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#343a40',
+  },
+  pageItem: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 10,
+  },
+  pageTitle: {
+    fontSize: 16,
+    color: '#007bff',
+  },
+  emptyListText: {
+    textAlign: 'center',
+    color: '#6c757d',
+    marginTop: 10,
     fontStyle: 'italic',
   },
+  addPageButtonContainer: {
+    marginTop: 15,
+  },
+  centeredLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
 });
-
-export default EditLessonScreen;

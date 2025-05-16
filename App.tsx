@@ -3,15 +3,17 @@ import { StyleSheet, View, Text, ActivityIndicator, Platform } from 'react-nativ
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { AuthProvider, useAuth } from './src/contexts/AuthContext';
-import Auth from './src/components/Auth';
+import ProfileEditScreen from './src/screens/ProfileEditScreen'; // Import the new screen
+import TopBar from './src/components/TopBar'; // Import the TopBar component
+import { supabase } from './src/lib/supabase'; // Import supabase
 import CourseListScreen from './src/screens/CourseListScreen';
 import CourseEditScreen from './src/screens/CourseEditScreen';
 import ModuleEditScreen from './src/screens/ModuleEditScreen';
 import LessonEditScreen from './src/screens/LessonEditScreen';
-import ProfileEditScreen from './src/screens/ProfileEditScreen'; // Import the new screen
-import TopBar from './src/components/TopBar'; // Import the TopBar component
-import { supabase } from './src/lib/supabase';
+import EditPageScreen from './src/screens/PageEditScreen'; // Import EditPageScreen
+import Auth from './src/components/Auth';
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+
 
 // Define the stack navigator types
 type RootStackParamList = {
@@ -19,6 +21,7 @@ type RootStackParamList = {
   CourseEdit: { courseId: string | null; refresh?: boolean };
   ModuleEdit: { courseId: string; moduleId: string | null; refresh?: boolean };
   LessonEdit: { moduleId: string; lessonId: string | null; refresh?: boolean };
+  PageEdit: { lessonId: string; pageId?: string | null; refresh?: boolean }; // Add PageEditScreen
   ProfileEdit: undefined; // Add ProfileEditScreen to the list
 };
 
@@ -137,6 +140,13 @@ function MainContent() {
             component={LessonEditScreen}
             options={({ route }) => ({
               title: route.params?.lessonId ? "Editar Lição" : "Criar Lição",
+            })}
+          />
+          <Stack.Screen
+            name="PageEdit"
+            component={EditPageScreen}
+            options={({ route }) => ({
+              title: route.params?.pageId ? "Editar Página" : "Criar Página",
             })}
           />
           <Stack.Screen
