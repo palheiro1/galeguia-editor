@@ -3,6 +3,7 @@ import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert, ActivityI
 import { supabase } from '../lib/supabase'; // Ensure this path is correct
 import { useRoute, useNavigation, useIsFocused, NavigationProp } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
+import { Picker } from '@react-native-picker/picker';
 
 // Define the types for route params and navigation
 type RootStackParamList = {
@@ -39,7 +40,7 @@ export default function LessonEditScreen() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [lessonType, setLessonType] = useState('');
+  const [lessonType, setLessonType] = useState('text'); // Default to 'text' or a valid type
   const [position, setPosition] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -373,12 +374,31 @@ export default function LessonEditScreen() {
       />
 
       <Text style={styles.label}>Tipo de Lição</Text>
-      <TextInput
-        style={styles.input}
-        value={lessonType}
-        onChangeText={setLessonType}
-        placeholder="Ex: texto, vídeo, quiz"
-      />
+      {Platform.OS === 'web' ? (
+        <select
+          value={lessonType}
+          onChange={(e) => setLessonType(e.target.value)}
+          style={styles.pickerSelect} 
+        >
+          <option value="text">Texto</option>
+          <option value="video">Vídeo</option>
+          <option value="image">Imagem</option>
+          <option value="audio">Áudio</option>
+          <option value="quiz">Quiz</option>
+        </select>
+      ) : (
+        <Picker
+          selectedValue={lessonType}
+          style={styles.picker}
+          onValueChange={(itemValue) => setLessonType(itemValue)}
+        >
+          <Picker.Item label="Texto" value="text" />
+          <Picker.Item label="Vídeo" value="video" />
+          <Picker.Item label="Imagem" value="image" />
+          <Picker.Item label="Áudio" value="audio" />
+          <Picker.Item label="Quiz" value="quiz" />
+        </Picker>
+      )}
 
       <Text style={styles.label}>Posição</Text>
       <TextInput
@@ -458,6 +478,24 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 15,
     fontSize: 16,
+  },
+  picker: { // Style for native Picker
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 4,
+    marginBottom: 15,
+  },
+  pickerSelect: { // Style for web select
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 15,
+    fontSize: 16,
+    height: 48, // Ensure consistent height with TextInput
+    justifyContent: 'center',
   },
   textArea: {
     minHeight: 120,
