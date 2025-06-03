@@ -12,6 +12,7 @@ import ModuleEditScreen from './src/screens/ModuleEditScreen';
 import LessonEditScreen from './src/screens/LessonEditScreen';
 import EditPageScreen from './src/screens/PageEditScreen'; // Import EditPageScreen
 import GrainEditScreen from './src/screens/GrainEditScreen'; // Import GrainEditScreen
+import PageTestScreen from './src/screens/PageTestScreen'; // Import PageTestScreen
 import Auth from './src/components/Auth';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
@@ -24,6 +25,7 @@ type RootStackParamList = {
   LessonEdit: { moduleId: string; lessonId: string | null; refresh?: boolean };
   PageEdit: { lessonId: string; pageId?: string | null; refresh?: boolean }; // Add PageEditScreen
   GrainEdit: { pageId: string; grainId?: string | null; position?: number; refresh?: boolean }; // Add GrainEditScreen
+  PageTest: { pageId: string; pageTitle?: string }; // Add PageTestScreen for "Provar Página" feature
   ProfileEdit: undefined; // Add ProfileEditScreen to the list
 };
 
@@ -153,6 +155,11 @@ function MainContent() {
             options={({ route }) => ({
               title: route.params?.grainId ? "Editar Grain" : "Criar Grain",
             })}
+          />
+          <Stack.Screen
+            name="PageTest"
+            component={PageTestScreen}
+            options={{ title: "Provar Página" }}
           />
           <Stack.Screen
             name="ProfileEdit"

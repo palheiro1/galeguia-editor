@@ -491,6 +491,18 @@ const EditPageScreen = () => {
     }
   };
 
+  const handleTestPage = () => {
+    if (!pageId) {
+      Alert.alert('Aviso', 'Guarde a página antes de testá-la');
+      return;
+    }
+    
+    navigation.navigate('PageTest', { 
+      pageId, 
+      pageTitle: title || 'Página de Teste' 
+    });
+  };
+
   const renderGrainItem = ({ item }: { item: Grain }) => (
     <View style={styles.grainItem}>
       <TouchableOpacity 
@@ -709,6 +721,12 @@ const EditPageScreen = () => {
       </TouchableOpacity>
 
       {pageId && (
+        <TouchableOpacity style={[styles.button, styles.testButton]} onPress={handleTestPage}>
+          <Text style={styles.buttonText}>Provar Página</Text>
+        </TouchableOpacity>
+      )}
+
+      {pageId && (
         <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={handleDelete}>
           <Text style={styles.buttonText}>Eliminar Página</Text>
         </TouchableOpacity>
@@ -807,6 +825,9 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#007BFF', // Primary blue
+  },
+  testButton: {
+    backgroundColor: '#28A745', // Green for test action
   },
   deleteButton: {
     backgroundColor: '#DC3545', // Danger red
