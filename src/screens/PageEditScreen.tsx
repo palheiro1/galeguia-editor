@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView, Platform } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView, Platform, FlatList, ActivityIndicator } from 'react-native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 
@@ -8,26 +8,81 @@ import { supabase } from '../lib/supabase';
 type PageEditScreenRouteParams = {
   lessonId: string; // Each page belongs to a lesson
   pageId?: string;   // Optional: for editing existing pages
+  refresh?: boolean;
+};
+
+// Define grain type for the list
+type Grain = {
+  id: string;
+  page_id: string;
+  position: number;
+  type: string;
+  content: any;
+  created_at: string;
+  updated_at: string;
+};
+
+// Define page types and their grain patterns
+type PageType = 'Introduction' | 'Booster' | 'Comparation' | 'Review' | 'Custom' | 'text';
+
+const PAGE_TYPE_PATTERNS: Record<Exclude<PageType, 'Custom' | 'text'>, string[]> = {
+  Introduction: [
+    'imagesToGuess', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete',
+    'pairsOfText',
+    'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete',
+    'pairsOfText'
+  ],
+  Booster: [
+    'textToComplete', 'testQuestion', 'imagesToGuess', 'textToComplete', 'pairsOfImage', 'testQuestion', 'imagesToGuess',
+    'pairsOfText',
+    'testQuestion', 'textToComplete', 'imagesToGuess', 'pairsOfImage', 'testQuestion', 'textToComplete',
+    'pairsOfText'
+  ],
+  Comparation: [
+    'imagesToGuess', 'textToGuess', 'imagesToGuess', 'textToGuess', 'imagesToGuess', 'textToGuess', 'imagesToGuess',
+    'pairsOfText',
+    'textToGuess', 'imagesToGuess', 'textToGuess', 'imagesToGuess', 'textToGuess', 'imagesToGuess',
+    'pairsOfText'
+  ],
+  Review: [
+    'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete',
+    'pairsOfText',
+    'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete', 'textToComplete',
+    'pairsOfText'
+  ]
 };
 
 const EditPageScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>(); // Use any for now to fix navigation typing
   const route = useRoute<RouteProp<{ params: PageEditScreenRouteParams }, 'params'>>();
-  const { lessonId, pageId } = route.params || {};
+  const { lessonId, pageId, refresh } = route.params || {};
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [position, setPosition] = useState<number>(0);
-  const [pageType, setPageType] = useState<string>('text'); // Default page type
+  const [pageType, setPageType] = useState<PageType>('Introduction'); // Default page type
+  const [grains, setGrains] = useState<Grain[]>([]);
+  const [isLoadingGrains, setIsLoadingGrains] = useState(false);
+  const [customGrainTypes, setCustomGrainTypes] = useState<string[]>(new Array(15).fill('textToComplete'));
 
   useEffect(() => {
     if (pageId) {
       loadPageData();
+      loadGrains();
     } else if (lessonId) {
       fetchNextPagePosition(lessonId);
     }
   }, [pageId, lessonId]);
+
+  // Reload grains when the screen is focused and refresh is true
+  useFocusEffect(
+    React.useCallback(() => {
+      if (pageId && refresh) {
+        loadGrains();
+      }
+    }, [pageId, refresh])
+  );
 
   const fetchNextPagePosition = async (currentLessonId: string) => {
     const { data, error } = await supabase
@@ -64,7 +119,164 @@ const EditPageScreen = () => {
       setContent(data.content || '');
       setMediaUrl(data.media_url || '');
       setPosition(data.position || 0);
-      setPageType(data.type || 'text');
+      setPageType((data.type as PageType) || 'Introduction');
+      
+      // Load custom grain pattern if it's a Custom page type
+      if (data.type === 'Custom' && data.grain_pattern) {
+        setCustomGrainTypes(data.grain_pattern);
+      } else {
+        // Reset to default pattern for non-custom pages
+        setCustomGrainTypes(new Array(15).fill('textToComplete'));
+      }
+    }
+  };
+
+  const loadGrains = async () => {
+    if (!pageId) return;
+    setIsLoadingGrains(true);
+    try {
+      const { data, error } = await supabase
+        .from('grains')
+        .select('*')
+        .eq('page_id', pageId)
+        .order('position', { ascending: true });
+
+      if (error) throw error;
+      setGrains(data || []);
+    } catch (error) {
+      console.error('Error loading grains:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os grains.');
+    } finally {
+      setIsLoadingGrains(false);
+    }
+  };
+
+  const createGrainsForPageType = async (pageId: string, pageType: PageType) => {
+    if (pageType === 'Custom') return; // Don't auto-create for custom pages
+
+    const pattern = PAGE_TYPE_PATTERNS[pageType as keyof typeof PAGE_TYPE_PATTERNS];
+    if (!pattern) {
+      console.warn(`No pattern found for page type: ${pageType}`);
+      return; // Don't create grains for unsupported types
+    }
+
+    const grainPromises = pattern.map((grainType, index) => {
+      const defaultContent = getDefaultContentForGrainType(grainType);
+      return supabase
+        .from('grains')
+        .insert({
+          page_id: pageId,
+          position: index + 1,
+          type: grainType,
+          content: defaultContent
+        });
+    });
+
+    try {
+      await Promise.all(grainPromises);
+      await loadGrains(); // Reload grains to show the new ones
+    } catch (error) {
+      console.error('Error creating grains for page type:', error);
+      Alert.alert('Erro', 'Erro ao criar grains para o tipo de página.');
+    }
+  };
+
+  const getDefaultContentForGrainType = (grainType: string) => {
+    switch (grainType) {
+      case 'textToComplete':
+        return { 
+          phrase: '', 
+          correctAnswer: '', 
+          falseAlternatives: ['', '', ''] 
+        };
+      case 'testQuestion':
+        return { 
+          question: '', 
+          correctAnswer: '', 
+          falseAlternatives: ['', '', ''] 
+        };
+      case 'imagesToGuess':
+        return { 
+          correctImageUrl: '', 
+          falseImageUrls: ['', '', ''], 
+          correctWord: '' 
+        };
+      case 'textToGuess':
+        return { 
+          imageUrl: '', 
+          correctAnswer: '', 
+          falseAlternatives: ['', '', ''] 
+        };
+      case 'audioToGuess':
+        return { 
+          correctWord: '', 
+          correctAudioUrl: '', 
+          falseAudioUrls: ['', '', ''] 
+        };
+      case 'pairsOfText':
+        return { 
+          pairs: [
+            { left: '', right: '' },
+            { left: '', right: '' },
+            { left: '', right: '' },
+            { left: '', right: '' }
+          ] 
+        };
+      case 'pairsOfImage':
+        return { 
+          pairs: [
+            { imageUrl: '', text: '' },
+            { imageUrl: '', text: '' },
+            { imageUrl: '', text: '' },
+            { imageUrl: '', text: '' }
+          ] 
+        };
+      default:
+        return {};
+    }
+  };
+
+  // Helper function to get expected grain type based on position and page type
+  const getExpectedGrainType = (position: number, pageType: PageType): string => {
+    if (pageType === 'Custom') {
+      // For custom pages, use the customGrainTypes array
+      return customGrainTypes[position - 1] || 'textToComplete';
+    }
+
+    if (pageType === 'text') {
+      // Legacy text pages - allow any grain type
+      return 'textToComplete'; // Default fallback
+    }
+
+    // For predefined page types, use the pattern
+    const pattern = PAGE_TYPE_PATTERNS[pageType as keyof typeof PAGE_TYPE_PATTERNS];
+    if (!pattern) {
+      console.warn(`No pattern found for page type: ${pageType}`);
+      return 'textToComplete'; // Default fallback
+    }
+
+    return pattern[position - 1] || 'textToComplete';
+  };
+
+  const createCustomGrains = async (pageId: string) => {
+    const grainPromises = customGrainTypes.map((grainType, index) => {
+      const defaultContent = getDefaultContentForGrainType(grainType);
+      return supabase
+        .from('grains')
+        .insert({
+          page_id: pageId,
+          position: index + 1,
+          type: grainType,
+          content: defaultContent
+        });
+    });
+
+    try {
+      await Promise.all(grainPromises);
+      await loadGrains(); // Reload grains to show the new ones
+    } catch (error) {
+      console.error('Error creating custom grains:', error);
+      Alert.alert('Erro', 'Erro ao criar grains personalizados.');
     }
   };
 
@@ -143,6 +355,7 @@ const EditPageScreen = () => {
       media_url: mediaUrl,
       position,
       type: pageType,
+      grain_pattern: pageType === 'Custom' ? customGrainTypes : null,
     };
 
     let response;
@@ -158,6 +371,15 @@ const EditPageScreen = () => {
       console.error('Error saving page:', response.error);
       Alert.alert('Erro', `Erro ao guardar a página: ${response.error.message}`);
     } else {
+      const savedPage = response.data?.[0];
+      if (savedPage && !pageId) {
+        // New page created, create grains based on page type
+        if (pageType === 'Custom') {
+          await createCustomGrains(savedPage.id);
+        } else {
+          await createGrainsForPageType(savedPage.id, pageType);
+        }
+      }
       Alert.alert('Sucesso', pageId ? 'Página atualizada com sucesso!' : 'Página criada com sucesso!');
       navigation.goBack(); // Or navigate to the lesson detail screen
     }
@@ -207,6 +429,159 @@ const EditPageScreen = () => {
     }
   };
 
+  const createGrain = () => {
+    if (!pageId) {
+      Alert.alert('Aviso', 'Guarde a página antes de criar grains');
+      return;
+    }
+    if (grains.length >= 15) {
+      Alert.alert('Limite atingido', 'Cada página pode ter no máximo 15 grains');
+      return;
+    }
+    const nextPosition = grains.length + 1;
+    const expectedGrainType = getExpectedGrainType(nextPosition, pageType);
+    navigation.navigate('GrainEdit', { 
+      pageId, 
+      grainId: null, 
+      position: nextPosition, 
+      expectedGrainType,
+      pageType,
+      refresh: true 
+    });
+  };
+
+  const editGrain = (grainId: string) => {
+    // Find the grain to get its position
+    const grain = grains.find(g => g.id === grainId);
+    const expectedGrainType = grain ? getExpectedGrainType(grain.position, pageType) : null;
+    navigation.navigate('GrainEdit', { 
+      pageId, 
+      grainId, 
+      expectedGrainType,
+      pageType,
+      refresh: true 
+    });
+  };
+
+  const deleteGrain = async (grainId: string) => {
+    const confirmMessage = 'Tens a certeza de que queres eliminar este grain?';
+    const performDelete = async () => {
+      try {
+        const { error } = await supabase
+          .from('grains')
+          .delete()
+          .eq('id', grainId);
+
+        if (error) throw error;
+        Alert.alert('Sucesso', 'Grain eliminado com sucesso');
+        loadGrains(); // Reload grains
+      } catch (error) {
+        console.error('Error deleting grain:', error);
+        Alert.alert('Erro', 'Erro ao eliminar grain');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(confirmMessage)) await performDelete();
+    } else {
+      Alert.alert('Confirmação', confirmMessage, [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: performDelete },
+      ]);
+    }
+  };
+
+  const renderGrainItem = ({ item }: { item: Grain }) => (
+    <View style={styles.grainItem}>
+      <TouchableOpacity 
+        style={styles.grainItemContent}
+        onPress={() => editGrain(item.id)}
+      >
+        <Text style={styles.grainTitle}>
+          {item.position}. {getGrainTypeLabel(item.type)}
+        </Text>
+        <Text style={styles.grainDescription}>
+          {getGrainDescription(item)}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.deleteGrainButton}
+        onPress={() => deleteGrain(item.id)}
+      >
+        <Text style={styles.deleteGrainText}>×</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const getGrainTypeLabel = (type: string) => {
+    const labels: { [key: string]: string } = {
+      textToComplete: 'Texto para Completar',
+      testQuestion: 'Pergunta de Teste',
+      imagesToGuess: 'Imagens para Adivinhar',
+      textToGuess: 'Texto para Adivinhar',
+      audioToGuess: 'Áudio para Adivinhar',
+      pairsOfText: 'Pares de Texto',
+      pairsOfImage: 'Pares de Imagem',
+    };
+    return labels[type] || type;
+  };
+
+  const showGrainTypeAlert = (index: number) => {
+    const grainTypes = [
+      { value: 'textToComplete', label: 'Texto para Completar' },
+      { value: 'testQuestion', label: 'Pergunta de Teste' },
+      { value: 'imagesToGuess', label: 'Imagens para Adivinhar' },
+      { value: 'textToGuess', label: 'Texto para Adivinhar' },
+      { value: 'audioToGuess', label: 'Áudio para Adivinhar' },
+      { value: 'pairsOfText', label: 'Pares de Texto' },
+      { value: 'pairsOfImage', label: 'Pares de Imagem' },
+    ];
+
+    const buttons = grainTypes.map(type => ({
+      text: type.label,
+      onPress: () => {
+        const newTypes = [...customGrainTypes];
+        newTypes[index] = type.value;
+        setCustomGrainTypes(newTypes);
+      }
+    }));
+
+    buttons.push({ text: 'Cancelar', onPress: () => {} });
+
+    Alert.alert(
+      `Selecionar tipo para posição ${index + 1}`,
+      'Escolha o tipo de grain:',
+      buttons,
+      { cancelable: true }
+    );
+  };
+
+  const getGrainDescription = (grain: Grain) => {
+    try {
+      const content = grain.content;
+      switch (grain.type) {
+        case 'textToComplete':
+          return content.phrase ? content.phrase.substring(0, 50) + '...' : 'Sem frase';
+        case 'testQuestion':
+          return content.question ? content.question.substring(0, 50) + '...' : 'Sem pergunta';
+        case 'imagesToGuess':
+          return content.correctWord || 'Sem palavra';
+        case 'textToGuess':
+          return content.correctAnswer || 'Sem resposta';
+        case 'audioToGuess':
+          return content.correctWord || 'Sem palavra';
+        case 'pairsOfText':
+          return `${content.pairs?.length || 0} pares de texto`;
+        case 'pairsOfImage':
+          return `${content.pairs?.length || 0} pares de imagem`;
+        default:
+          return 'Conteúdo não definido';
+      }
+    } catch {
+      return 'Erro ao carregar conteúdo';
+    }
+  };
+
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
       <Text style={styles.label}>Título da Página:</Text>
@@ -222,27 +597,111 @@ const EditPageScreen = () => {
       />
 
       <Text style={styles.label}>Tipo de Página:</Text>
-      <TextInput value={pageType} onChangeText={setPageType} style={styles.input} placeholder="Ex: text, image, video_embed" />
-      {/* Consider using a Picker or custom buttons for pageType selection for better UX */}
-
-      <Text style={styles.label}>Conteúdo da Página:</Text>
-      <TextInput
-        value={content}
-        onChangeText={setContent}
-        style={styles.textArea}
-        multiline
-        placeholder="Escreve o conteúdo da página aqui..."
-      />
-
-      <TouchableOpacity style={[styles.button, styles.uploadButton]} onPress={uploadMedia}>
-        <Text style={styles.buttonText}>Carregar Multimédia</Text>
-      </TouchableOpacity>
-      {mediaUrl ? (
-        <View>
-            <Text style={styles.mediaUrlText}>Ficheiro carregado: {mediaUrl.substring(mediaUrl.lastIndexOf('/') + 1)}</Text>
-            {/* Optionally, display the image or a video player if mediaUrl is set */}
+      {Platform.OS === 'web' ? (
+        <select
+          value={pageType}
+          onChange={(e) => setPageType(e.target.value as PageType)}
+          style={styles.pageTypeSelect}
+        >
+          <option value="Introduction">Introduction</option>
+          <option value="Booster">Booster</option>
+          <option value="Comparation">Comparation</option>
+          <option value="Review">Review</option>
+          <option value="Custom">Custom</option>
+          <option value="text">Text (Deprecated)</option>
+        </select>
+      ) : (
+        <View style={styles.pageTypeContainer}>
+          {(['Introduction', 'Booster', 'Comparation', 'Review', 'Custom', 'text'] as const).map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.pageTypeButton,
+                pageType === type && styles.pageTypeButtonActive
+              ]}
+              onPress={() => setPageType(type)}
+            >
+              <Text style={[
+                styles.pageTypeButtonText,
+                pageType === type && styles.pageTypeButtonTextActive
+              ]}>
+                {type === 'text' ? 'Text (Deprecated)' : type}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      ) : null}
+      )}
+
+      {/* Page Structure Display */}
+      <View style={styles.pageStructureSection}>
+        <Text style={styles.label}>Estrutura da Página (15 Grains):</Text>
+        
+        {pageType === 'Custom' ? (
+          // Custom page type - allow grain type selection for each position
+          <View>
+            <Text style={styles.structureDescription}>
+              Configure o tipo de grain para cada uma das 15 posições:
+            </Text>
+            {customGrainTypes.map((grainType, index) => (
+              <View key={index} style={styles.grainStructureRow}>
+                <Text style={styles.grainPositionLabel}>{index + 1}.</Text>
+                {Platform.OS === 'web' ? (
+                  <select
+                    value={grainType}
+                    onChange={(e) => {
+                      const newTypes = [...customGrainTypes];
+                      newTypes[index] = e.target.value;
+                      setCustomGrainTypes(newTypes);
+                    }}
+                    style={styles.grainTypeSelect}
+                  >
+                    <option value="textToComplete">Texto para Completar</option>
+                    <option value="testQuestion">Pergunta de Teste</option>
+                    <option value="imagesToGuess">Imagens para Adivinhar</option>
+                    <option value="textToGuess">Texto para Adivinhar</option>
+                    <option value="audioToGuess">Áudio para Adivinhar</option>
+                    <option value="pairsOfText">Pares de Texto</option>
+                    <option value="pairsOfImage">Pares de Imagem</option>
+                  </select>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.grainTypeSelector}
+                    onPress={() => showGrainTypeAlert(index)}
+                  >
+                    <Text style={styles.grainTypeSelectorText}>
+                      {getGrainTypeLabel(grainType)}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
+        ) : (
+          // Predefined page types - show the fixed structure
+          <View>
+            <Text style={styles.structureDescription}>
+              {PAGE_TYPE_PATTERNS[pageType as keyof typeof PAGE_TYPE_PATTERNS] 
+                ? 'Esta página seguirá a seguinte estrutura de grains:'
+                : 'Esta página utiliza um tipo não suportado. Altere o tipo para ver a estrutura.'}
+            </Text>
+            {PAGE_TYPE_PATTERNS[pageType as keyof typeof PAGE_TYPE_PATTERNS]?.map((grainType, index) => (
+              <View key={index} style={styles.grainStructureRow}>
+                <Text style={styles.grainPositionLabel}>{index + 1}.</Text>
+                <Text style={styles.grainTypeLabel}>
+                  {getGrainTypeLabel(grainType)}
+                </Text>
+                {(index === 7 || index === 14) && (
+                  <Text style={styles.grainTypeNote}>(Pair Exercise)</Text>
+                )}
+              </View>
+            )) || (
+              <Text style={styles.structureDescription}>
+                Selecione um tipo de página válido (Introduction, Booster, Comparation, Review, ou Custom).
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
 
 
       <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSave}>
@@ -253,6 +712,35 @@ const EditPageScreen = () => {
         <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={handleDelete}>
           <Text style={styles.buttonText}>Eliminar Página</Text>
         </TouchableOpacity>
+      )}
+
+      {/* Grains Section */}
+      {pageId && (
+        <View style={styles.grainsSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Grains da Página ({grains.length}/15)</Text>
+            <TouchableOpacity
+              style={[styles.addGrainButton, grains.length >= 15 && styles.disabledButton]}
+              onPress={createGrain}
+              disabled={grains.length >= 15}
+            >
+              <Text style={styles.addGrainButtonText}>+ Adicionar Grain</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {isLoadingGrains ? (
+            <ActivityIndicator size="small" color="#007BFF" />
+          ) : grains.length === 0 ? (
+            <Text style={styles.emptyText}>Nenhum grain adicionado ainda.</Text>
+          ) : (
+            <FlatList
+              data={grains}
+              renderItem={renderGrainItem}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+            />
+          )}
+        </View>
       )}
     </ScrollView>
   );
@@ -328,6 +816,181 @@ const styles = StyleSheet.create({
     color: '#495057',
     marginBottom: 16,
     fontStyle: 'italic',
+  },
+  grainsSection: {
+    marginTop: 30,
+    borderTopWidth: 1,
+    borderTopColor: '#DEE2E6',
+    paddingTop: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#212529',
+  },
+  addGrainButton: {
+    backgroundColor: '#28A745',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  addGrainButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#6C757D',
+    fontStyle: 'italic',
+    marginTop: 10,
+  },
+  grainItem: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#DEE2E6',
+    alignItems: 'center',
+  },
+  grainItemContent: {
+    flex: 1,
+  },
+  grainTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#007BFF',
+    marginBottom: 4,
+  },
+  grainDescription: {
+    fontSize: 14,
+    color: '#6C757D',
+  },
+  deleteGrainButton: {
+    backgroundColor: '#DC3545',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  deleteGrainText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // Page type selection styles
+  pageTypeSelect: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CED4DA',
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  pageTypeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+    gap: 8,
+  },
+  pageTypeButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#CED4DA',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  pageTypeButtonActive: {
+    backgroundColor: '#007BFF',
+    borderColor: '#007BFF',
+  },
+  pageTypeButtonText: {
+    fontSize: 14,
+    color: '#495057',
+    fontWeight: '500',
+  },
+  pageTypeButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  // Page structure display styles
+  pageStructureSection: {
+    marginBottom: 20,
+    backgroundColor: '#F8F9FA',
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DEE2E6',
+  },
+  structureDescription: {
+    fontSize: 14,
+    color: '#6C757D',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  grainStructureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingVertical: 4,
+  },
+  grainPositionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    minWidth: 30,
+    marginRight: 10,
+  },
+  grainTypeLabel: {
+    fontSize: 14,
+    color: '#212529',
+    flex: 1,
+  },
+  grainTypeNote: {
+    fontSize: 12,
+    color: '#28A745',
+    fontStyle: 'italic',
+    marginLeft: 8,
+  },
+  grainTypeSelect: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#CED4DA',
+    fontSize: 14,
+  },
+  grainTypeSelector: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#CED4DA',
+  },
+  grainTypeSelectorText: {
+    fontSize: 14,
+    color: '#495057',
   },
 });
 

@@ -11,6 +11,7 @@ import CourseEditScreen from './src/screens/CourseEditScreen';
 import ModuleEditScreen from './src/screens/ModuleEditScreen';
 import LessonEditScreen from './src/screens/LessonEditScreen';
 import EditPageScreen from './src/screens/PageEditScreen'; // Import EditPageScreen
+import GrainEditScreen from './src/screens/GrainEditScreen'; // Import GrainEditScreen
 import Auth from './src/components/Auth';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
@@ -22,6 +23,7 @@ type RootStackParamList = {
   ModuleEdit: { courseId: string; moduleId: string | null; refresh?: boolean };
   LessonEdit: { moduleId: string; lessonId: string | null; refresh?: boolean };
   PageEdit: { lessonId: string; pageId?: string | null; refresh?: boolean }; // Add PageEditScreen
+  GrainEdit: { pageId: string; grainId?: string | null; position?: number; refresh?: boolean }; // Add GrainEditScreen
   ProfileEdit: undefined; // Add ProfileEditScreen to the list
 };
 
@@ -143,6 +145,13 @@ function MainContent() {
             component={EditPageScreen}
             options={({ route }) => ({
               title: route.params?.pageId ? "Editar Página" : "Criar Página",
+            })}
+          />
+          <Stack.Screen
+            name="GrainEdit"
+            component={GrainEditScreen}
+            options={({ route }) => ({
+              title: route.params?.grainId ? "Editar Grain" : "Criar Grain",
             })}
           />
           <Stack.Screen

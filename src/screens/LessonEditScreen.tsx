@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Platform, FlatList } from 'react-native';
 import { supabase } from '../lib/supabase'; // Ensure this path is correct
 import { useRoute, useNavigation, useIsFocused, NavigationProp } from '@react-navigation/native';
-import * as DocumentPicker from 'expo-document-picker';
-import { Picker } from '@react-native-picker/picker';
 
 // Define the types for route params and navigation
 type RootStackParamList = {
@@ -39,11 +37,8 @@ export default function LessonEditScreen() {
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [lessonType, setLessonType] = useState('text'); // Default to 'text' or a valid type
   const [position, setPosition] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [pages, setPages] = useState<Page[]>([]);
 
   const fetchNextLessonPosition = useCallback(async () => {
@@ -89,8 +84,6 @@ export default function LessonEditScreen() {
       if (data) {
         setTitle(data.title || '');
         setContent(data.content || '');
-        setMediaUrl(data.media_url || null);
-        setLessonType(data.type || '');
         setPosition(String(data.position) || ''); // Convert to string for input
       } else {
         // If no data found for lessonId, perhaps it's a new lesson or an error
@@ -143,72 +136,6 @@ export default function LessonEditScreen() {
     }
   }, [isFocused, lessonId, loadLessonData, loadPagesData, fetchNextLessonPosition]);
 
-  const handlePickMedia = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*', // Allow all file types
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled) {
-        console.log('Document picking cancelled');
-        return;
-      }
-
-      if (result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        const { uri, name, mimeType } = asset;
-
-        if (!uri) {
-          Alert.alert('Erro', 'Não foi possível obter o URI do ficheiro.');
-          return;
-        }
-
-        setIsUploading(true);
-        const fileName = name || `media.${uri.split('.').pop()}`;
-        const actualMimeType = mimeType || 'application/octet-stream';
-
-        // Fetch the file as a blob
-        const response = await fetch(uri);
-        const blob = await response.blob();
-
-        const filePath = `${Date.now()}-${fileName}`;
-
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('course-content') // Make sure this bucket exists and has correct policies
-          .upload(filePath, blob, {
-            contentType: actualMimeType,
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error('Error uploading file:', uploadError);
-          Alert.alert('Erro de Upload', uploadError.message);
-          setIsUploading(false);
-          return;
-        }
-
-        const { data: publicUrlData } = supabase.storage
-          .from('course-content')
-          .getPublicUrl(filePath);
-
-        if (!publicUrlData?.publicUrl) {
-          Alert.alert('Erro', 'Ficheiro carregado, mas não foi possível obter a URL pública.');
-        } else {
-          setMediaUrl(publicUrlData.publicUrl);
-          Alert.alert('Sucesso', 'Mídia carregada com sucesso!');
-        }
-      } else {
-        Alert.alert('Erro', 'Nenhum ficheiro foi selecionado.');
-      }
-    } catch (err: any) {
-      console.error('Error picking or uploading media:', err);
-      Alert.alert('Erro de Mídia', err.message || 'Ocorreu um erro ao processar a mídia.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleSave = async () => {
     if (!title.trim()) {
       Alert.alert('Erro', 'O título da lição é obrigatório.');
@@ -235,8 +162,6 @@ export default function LessonEditScreen() {
         module_id: moduleId,
         title: title.trim(),
         content: content,
-        media_url: mediaUrl,
-        type: lessonType.trim(),
         position: currentPosition,
       };
 
@@ -342,7 +267,7 @@ export default function LessonEditScreen() {
     </TouchableOpacity>
   );
 
-  if (isLoading && !isUploading && !isFocused && lessonId) { // Only show full screen loader if loading existing lesson data initially
+  if (isLoading && !isFocused && lessonId) { // Only show full screen loader if loading existing lesson data initially
     return (
       <View style={styles.centeredLoading}>
         <ActivityIndicator size="large" color="#007bff" />
@@ -373,33 +298,6 @@ export default function LessonEditScreen() {
         multiline
       />
 
-      <Text style={styles.label}>Tipo de Lição</Text>
-      {Platform.OS === 'web' ? (
-        <select
-          value={lessonType}
-          onChange={(e) => setLessonType(e.target.value)}
-          style={styles.pickerSelect} 
-        >
-          <option value="text">Texto</option>
-          <option value="video">Vídeo</option>
-          <option value="image">Imagem</option>
-          <option value="audio">Áudio</option>
-          <option value="quiz">Quiz</option>
-        </select>
-      ) : (
-        <Picker
-          selectedValue={lessonType}
-          style={styles.picker}
-          onValueChange={(itemValue) => setLessonType(itemValue)}
-        >
-          <Picker.Item label="Texto" value="text" />
-          <Picker.Item label="Vídeo" value="video" />
-          <Picker.Item label="Imagem" value="image" />
-          <Picker.Item label="Áudio" value="audio" />
-          <Picker.Item label="Quiz" value="quiz" />
-        </Picker>
-      )}
-
       <Text style={styles.label}>Posição</Text>
       <TextInput
         style={styles.input}
@@ -409,19 +307,13 @@ export default function LessonEditScreen() {
         keyboardType="numeric"
       />
 
-      <View style={styles.mediaContainer}>
-        <Button title={mediaUrl ? "Alterar Mídia" : "Adicionar Mídia (Opcional)"} onPress={handlePickMedia} color="#007bff" />
-        {isUploading && <ActivityIndicator size="small" color="#007bff" style={{ marginLeft: 10 }} />}
-        {mediaUrl && !isUploading && <Text style={styles.mediaText}>Mídia carregada: {mediaUrl.split('/').pop()}</Text>}
-      </View>
-
       <View style={styles.buttonContainer}>
-        <Button title="Salvar Lição" onPress={handleSave} disabled={isLoading || isUploading} color="#28a745" />
+        <Button title="Salvar Lição" onPress={handleSave} disabled={isLoading} color="#28a745" />
       </View>
 
       {lessonId && (
         <View style={styles.buttonContainer}>
-          <Button title="Excluir Lição" onPress={handleDelete} disabled={isLoading || isUploading} color="#dc3545" />
+          <Button title="Excluir Lição" onPress={handleDelete} disabled={isLoading} color="#dc3545" />
         </View>
       )}
 
@@ -441,7 +333,7 @@ export default function LessonEditScreen() {
               title="Adicionar Nova Página"
               onPress={() => navigation.navigate('PageEdit', { lessonId: lessonId!, pageId: null, refresh: true })}
               color="#17a2b8"
-              disabled={!lessonId || isLoading || isUploading} 
+              disabled={!lessonId || isLoading} 
             />
           </View>
         </View>
@@ -479,38 +371,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontSize: 16,
   },
-  picker: { // Style for native Picker
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ced4da',
-    borderRadius: 4,
-    marginBottom: 15,
-  },
-  pickerSelect: { // Style for web select
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ced4da',
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 15,
-    fontSize: 16,
-    height: 48, // Ensure consistent height with TextInput
-    justifyContent: 'center',
-  },
   textArea: {
     minHeight: 120,
     textAlignVertical: 'top',
-  },
-  mediaContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 10,
-  },
-  mediaText: {
-    marginLeft: 10,
-    fontSize: 14,
-    color: '#6c757d',
   },
   buttonContainer: {
     marginTop: 10,

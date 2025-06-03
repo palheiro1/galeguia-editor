@@ -1,0 +1,110 @@
+{
+  "project": "GaleguiaDeep",
+  "project_id": "ovbtatknjeshtilqkxln",
+  "tables": [
+    {
+      "name": "courses",
+      "schema": "public",
+      "rls_enabled": true,
+      "columns": [
+        {"name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false},
+        {"name": "title", "type": "text", "nullable": false},
+        {"name": "description", "type": "text", "nullable": true},
+        {"name": "cover_image_url", "type": "text", "nullable": true},
+        {"name": "creator_id", "type": "uuid", "nullable": false},
+        {"name": "published", "type": "boolean", "default": "false", "nullable": false},
+        {"name": "created_at", "type": "timestamptz", "default": "now()", "nullable": true},
+        {"name": "updated_at", "type": "timestamptz", "default": "now()", "nullable": true}
+      ],
+      "primary_key": ["id"],
+      "relationships": [
+        {"source_table": "modules", "source_column": "course_id", "target_table": "courses", "target_column": "id"},
+        {"source_table": "courses", "source_column": "creator_id", "target_table": "users", "target_column": "id", "target_schema": "auth"}
+      ]
+    },
+    {
+      "name": "lessons",
+      "schema": "public",
+      "rls_enabled": true,
+      "columns": [
+        {"name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false},
+        {"name": "module_id", "type": "uuid", "nullable": false},
+        {"name": "title", "type": "text", "nullable": false},
+        {"name": "content", "type": "text", "nullable": true},
+        {"name": "type", "type": "text", "default": "'text'::text", "nullable": false, "check": "type = ANY (['text','video','image','audio'])"},
+        {"name": "media_url", "type": "text", "nullable": true},
+        {"name": "position", "type": "integer", "default": "0", "nullable": false},
+        {"name": "created_at", "type": "timestamptz", "default": "now()", "nullable": true},
+        {"name": "updated_at", "type": "timestamptz", "default": "now()", "nullable": true}
+      ],
+      "primary_key": ["id"],
+      "relationships": [
+        {"source_table": "pages", "source_column": "lesson_id", "target_table": "lessons", "target_column": "id"},
+        {"source_table": "lessons", "source_column": "module_id", "target_table": "modules", "target_column": "id"}
+      ]
+    },
+    {
+      "name": "modules",
+      "schema": "public",
+      "rls_enabled": true,
+      "columns": [
+        {"name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false},
+        {"name": "course_id", "type": "uuid", "nullable": false},
+        {"name": "title", "type": "text", "nullable": false},
+        {"name": "position", "type": "integer", "default": "0", "nullable": false},
+        {"name": "created_at", "type": "timestamptz", "default": "now()", "nullable": true},
+        {"name": "updated_at", "type": "timestamptz", "default": "now()", "nullable": true}
+      ],
+      "primary_key": ["id"],
+      "relationships": [
+        {"source_table": "lessons", "source_column": "module_id", "target_table": "modules", "target_column": "id"},
+        {"source_table": "modules", "source_column": "course_id", "target_table": "courses", "target_column": "id"}
+      ]
+    },
+    {
+      "name": "profiles",
+      "schema": "public",
+      "rls_enabled": true,
+      "columns": [
+        {"name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false},
+        {"name": "user_id", "type": "uuid", "nullable": false, "unique": true},
+        {"name": "username", "type": "text", "nullable": true},
+        {"name": "role", "type": "text", "default": "'creator'::text", "nullable": false, "check": "role = ANY (['admin','creator'])"},
+        {"name": "created_at", "type": "timestamptz", "default": "now()", "nullable": true}
+      ],
+      "primary_key": ["id"],
+      "relationships": [
+        {"source_table": "profiles", "source_column": "user_id", "target_table": "users", "target_column": "id", "target_schema": "auth"}
+      ]
+    },
+    {
+      "name": "pages",
+      "schema": "public",
+      "rls_enabled": false,
+      "columns": [
+        {"name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false},
+        {"name": "lesson_id", "type": "uuid", "nullable": false},
+        {"name": "position", "type": "integer", "default": "0", "nullable": false},
+        {"name": "title", "type": "text", "nullable": true},
+        {"name": "content", "type": "text", "nullable": true},
+        {"name": "media_url", "type": "text", "nullable": true},
+        {"name": "type", "type": "text", "default": "'text'::text", "nullable": false},
+        {"name": "created_at", "type": "timestamptz", "default": "now()", "nullable": false},
+        {"name": "updated_at", "type": "timestamptz", "default": "now()", "nullable": false}
+      ],
+      "primary_key": ["id"],
+      "relationships": [
+        {"source_table": "pages", "source_column": "lesson_id", "target_table": "lessons", "target_column": "id"}
+      ]
+    }
+  ],
+  "extensions": [
+    {"name": "pgcrypto", "schema": "extensions", "version": "1.3", "comment": "cryptographic functions"},
+    {"name": "pgjwt", "schema": "extensions", "version": "0.2.0", "comment": "JSON Web Token API for Postgresql"},
+    {"name": "uuid-ossp", "schema": "extensions", "version": "1.1", "comment": "generate universally unique identifiers (UUIDs)"},
+    {"name": "supabase_vault", "schema": "vault", "version": "0.3.1", "comment": "Supabase Vault Extension"},
+    {"name": "pg_stat_statements", "schema": "extensions", "version": "1.10", "comment": "track planning and execution statistics of all SQL statements executed"},
+    {"name": "pg_graphql", "schema": "graphql", "version": "1.5.11", "comment": "pg_graphql: GraphQL support"}
+  ],
+  "migrations": "unavailable"
+}

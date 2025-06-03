@@ -19,6 +19,16 @@ Galeguia Editor is a cross-platform course creation and management application b
   - Rich content editing for lessons
   - Media upload and management
   - Proper positioning within modules
+- **Page Management**:
+  - Create and organize pages within lessons
+  - Support for different page types and media content
+  - Structured content organization
+- **Grains System** (Educational Units):
+  - Interactive educational components within pages
+  - 5 different grain types: Text to Complete, Test Questions, Images to Guess, Pairs of Text, Pairs of Images
+  - Maximum of 15 grains per page
+  - Rich content validation and management
+  - Position-based ordering system
 
 ## 🔧 Tech Stack
 
@@ -53,7 +63,9 @@ galeguia-editor/
 │       ├── CourseListScreen.tsx    # List of courses
 │       ├── CourseEditScreen.tsx    # Course creation/editing
 │       ├── ModuleEditScreen.tsx    # Module creation/editing
-│       └── LessonEditScreen.tsx    # Lesson creation/editing
+│       ├── LessonEditScreen.tsx    # Lesson creation/editing
+│       ├── PageEditScreen.tsx      # Page creation/editing
+│       └── GrainEditScreen.tsx     # Grain creation/editing
 ├── static/                 # Static files for web deployment
 ├── App.tsx                 # Main application component
 ├── app.json                # Expo configuration
@@ -68,6 +80,8 @@ The application uses the following Supabase tables:
 - **courses**: Course information
 - **modules**: Course modules with position ordering
 - **lessons**: Module lessons with content and media
+- **pages**: Individual pages within lessons
+- **grains**: Interactive educational units within pages (5 types supported)
 
 ## 🛠️ Setup and Installation
 
