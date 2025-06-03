@@ -29,6 +29,10 @@ type Course = {
   creator_id: string;
   created_at: string;
   updated_at: string;
+  modules_count?: number | null;
+  lessons_per_module?: number | null;
+  pages_per_lesson?: number | null;
+  structure_created?: boolean;
 };
 
 type Module = {
@@ -36,6 +40,12 @@ type Module = {
   course_id: string;
   title: string;
   position: number;
+};
+
+type CourseStructure = {
+  modulesCount: number;
+  lessonsPerModule: number;
+  pagesPerLesson: number;
 };
 
 export default function CourseEditScreen({ route, navigation }: any) {
@@ -52,6 +62,15 @@ export default function CourseEditScreen({ route, navigation }: any) {
   const [isSaving, setIsSaving] = useState(false);
   const [modules, setModules] = useState<Module[]>([]);
   const [imageLoadError, setImageLoadError] = useState<string | null>(null);
+  
+  // Course structure state
+  const [showStructureForm, setShowStructureForm] = useState(false);
+  const [courseStructure, setCourseStructure] = useState<CourseStructure>({
+    modulesCount: 3,
+    lessonsPerModule: 5,
+    pagesPerLesson: 4,
+  });
+  const [structureCreated, setStructureCreated] = useState(false);
 
   useEffect(() => {
     if (!isNewCourse) fetchCourseData();
@@ -81,6 +100,17 @@ export default function CourseEditScreen({ route, navigation }: any) {
         setCoverImageUrl(data.cover_image_url);
         setImageLoadError(null);
         setPublished(data.published);
+        
+        // Load structure data
+        if (data.modules_count && data.lessons_per_module && data.pages_per_lesson) {
+          setCourseStructure({
+            modulesCount: data.modules_count,
+            lessonsPerModule: data.lessons_per_module,
+            pagesPerLesson: data.pages_per_lesson,
+          });
+        }
+        setStructureCreated(data.structure_created || false);
+        
         await fetchModules();
       }
     } catch (error) {
@@ -184,11 +214,31 @@ export default function CourseEditScreen({ route, navigation }: any) {
       };
 
       if (isNewCourse) {
-        const { error } = await supabase
+        // For new courses, include structure data
+        const newCourseData = {
+          ...courseData,
+          creator_id: userId,
+          published: false,
+          created_at: new Date().toISOString(),
+          modules_count: courseStructure.modulesCount,
+          lessons_per_module: courseStructure.lessonsPerModule,
+          pages_per_lesson: courseStructure.pagesPerLesson,
+          structure_created: false,
+        };
+
+        const { data: insertedCourse, error } = await supabase
           .from('courses')
-          .insert({ ...courseData, creator_id: userId, published: false, created_at: new Date().toISOString() });
+          .insert(newCourseData)
+          .select()
+          .single();
 
         if (error) throw error;
+        
+        // Create the course structure
+        if (insertedCourse) {
+          await createCourseStructure(insertedCourse.id);
+        }
+        
         Alert.alert('Sucesso', 'Curso criado com sucesso');
         navigation.navigate('CourseList');
       } else {
@@ -244,6 +294,95 @@ export default function CourseEditScreen({ route, navigation }: any) {
     navigation.navigate('ModuleEdit', { courseId, moduleId: null });
   };
 
+  const createCourseStructure = async (courseId: string) => {
+    try {
+      // Create modules
+      const modules = [];
+      for (let moduleIndex = 1; moduleIndex <= courseStructure.modulesCount; moduleIndex++) {
+        const { data: moduleData, error: moduleError } = await supabase
+          .from('modules')
+          .insert({
+            course_id: courseId,
+            title: `Módulo ${moduleIndex}`,
+            position: moduleIndex,
+          })
+          .select()
+          .single();
+
+        if (moduleError) throw moduleError;
+        modules.push(moduleData);
+
+        // Create lessons for each module
+        const lessons = [];
+        for (let lessonIndex = 1; lessonIndex <= courseStructure.lessonsPerModule; lessonIndex++) {
+          const { data: lessonData, error: lessonError } = await supabase
+            .from('lessons')
+            .insert({
+              module_id: moduleData.id,
+              title: `Lição ${lessonIndex}`,
+              position: lessonIndex,
+            })
+            .select()
+            .single();
+
+          if (lessonError) throw lessonError;
+          lessons.push(lessonData);
+
+          // Create pages for each lesson
+          for (let pageIndex = 1; pageIndex <= courseStructure.pagesPerLesson; pageIndex++) {
+            const { data: pageData, error: pageError } = await supabase
+              .from('pages')
+              .insert({
+                lesson_id: lessonData.id,
+                title: `Página ${pageIndex}`,
+                position: pageIndex,
+                type: 'Introduction', // Default type
+              })
+              .select()
+              .single();
+
+            if (pageError) throw pageError;
+
+            // Create 15 grains for each page
+            const grains = [];
+            for (let grainIndex = 1; grainIndex <= 15; grainIndex++) {
+              grains.push({
+                page_id: pageData.id,
+                position: grainIndex,
+                type: 'textToComplete', // Default grain type
+                content: {
+                  text: '',
+                  options: [],
+                  correctAnswer: '',
+                },
+              });
+            }
+
+            const { error: grainsError } = await supabase
+              .from('grains')
+              .insert(grains);
+
+            if (grainsError) throw grainsError;
+          }
+        }
+      }
+
+      // Mark structure as created
+      const { error: updateError } = await supabase
+        .from('courses')
+        .update({ structure_created: true })
+        .eq('id', courseId);
+
+      if (updateError) throw updateError;
+      
+      setStructureCreated(true);
+    } catch (error) {
+      console.error('Erro ao criar estrutura do curso:', error);
+      Alert.alert('Erro', 'Falha ao criar estrutura do curso');
+      throw error;
+    }
+  };
+
   const editModule = (moduleId: string) => {
     navigation.navigate('ModuleEdit', { courseId, moduleId });
   };
@@ -276,60 +415,199 @@ export default function CourseEditScreen({ route, navigation }: any) {
       </View>
 
       <View style={styles.form}>
-        <Text style={styles.label}>Título do Curso *</Text>
-        <TextInput style={styles.input} placeholder="Título do curso" value={title} onChangeText={setTitle} />
-
-        <Text style={styles.label}>Descrição</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Descrição do curso"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-        />
-
-        <Text style={styles.label}>Imagem de Capa</Text>
-        <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
-          <Text style={styles.imageUploadText}>
-            {coverImageUrl ? 'Alterar Imagem de Capa' : 'Selecionar Imagem de Capa'}
-          </Text>
-        </TouchableOpacity>
-
-        {coverImageUrl && !imageLoadError ? (
-          <Image key={coverImageUrl} source={{ uri: coverImageUrl }} style={styles.imagePreview} onError={handleImageError} />
-        ) : (
-          <View style={[styles.imagePreviewContainer, styles.imagePlaceholder]}>
-            <Text style={styles.placeholderText}>
-              {imageLoadError ? imageLoadError : 'Nenhuma imagem de capa selecionada'}
+        {isNewCourse && !showStructureForm && (
+          <View style={styles.structurePrompt}>
+            <Text style={styles.structureTitle}>Definir Estrutura do Curso</Text>
+            <Text style={styles.structureDescription}>
+              Para garantir consistência, defina primeiro a estrutura do seu curso:
             </Text>
+            <View style={styles.structurePreview}>
+              <Text style={styles.previewText}>
+                📚 {courseStructure.modulesCount} Módulos
+              </Text>
+              <Text style={styles.previewText}>
+                📖 {courseStructure.lessonsPerModule} Lições por módulo
+              </Text>
+              <Text style={styles.previewText}>
+                📄 {courseStructure.pagesPerLesson} Páginas por lição
+              </Text>
+              <Text style={styles.previewText}>
+                ⚡ 15 Grãos por página (fixo)
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.configureButton} 
+              onPress={() => setShowStructureForm(true)}
+            >
+              <Text style={styles.configureButtonText}>Configurar Estrutura</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {!isNewCourse && (
-          <FlatList
-            data={modules}
-            keyExtractor={(item) => item.id}
-            renderItem={renderModuleItem}
-          />
+        {isNewCourse && showStructureForm && (
+          <View style={styles.structureForm}>
+            <Text style={styles.structureTitle}>Configurar Estrutura do Curso</Text>
+            
+            <View style={styles.structureField}>
+              <Text style={styles.structureLabel}>Número de Módulos (recomendado: 10):</Text>
+              <View style={styles.numberInputContainer}>
+                <TouchableOpacity 
+                  style={styles.numberButton}
+                  onPress={() => setCourseStructure(prev => ({ 
+                    ...prev, 
+                    modulesCount: Math.max(1, prev.modulesCount - 1) 
+                  }))}
+                >
+                  <Text style={styles.numberButtonText}>-</Text>
+                </TouchableOpacity>
+                <Text style={styles.numberDisplay}>{courseStructure.modulesCount}</Text>
+                <TouchableOpacity 
+                  style={styles.numberButton}
+                  onPress={() => setCourseStructure(prev => ({ 
+                    ...prev, 
+                    modulesCount: Math.min(20, prev.modulesCount + 1) 
+                  }))}
+                >
+                  <Text style={styles.numberButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.structureField}>
+              <Text style={styles.structureLabel}>Lições por Módulo (recomendado: 10):</Text>
+              <View style={styles.numberInputContainer}>
+                <TouchableOpacity 
+                  style={styles.numberButton}
+                  onPress={() => setCourseStructure(prev => ({ 
+                    ...prev, 
+                    lessonsPerModule: Math.max(1, prev.lessonsPerModule - 1) 
+                  }))}
+                >
+                  <Text style={styles.numberButtonText}>-</Text>
+                </TouchableOpacity>
+                <Text style={styles.numberDisplay}>{courseStructure.lessonsPerModule}</Text>
+                <TouchableOpacity 
+                  style={styles.numberButton}
+                  onPress={() => setCourseStructure(prev => ({ 
+                    ...prev, 
+                    lessonsPerModule: Math.min(20, prev.lessonsPerModule + 1) 
+                  }))}
+                >
+                  <Text style={styles.numberButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.structureField}>
+              <Text style={styles.structureLabel}>Páginas por Lição (recomendado: 4):</Text>
+              <View style={styles.numberInputContainer}>
+                <TouchableOpacity 
+                  style={styles.numberButton}
+                  onPress={() => setCourseStructure(prev => ({ 
+                    ...prev, 
+                    pagesPerLesson: Math.max(1, prev.pagesPerLesson - 1) 
+                  }))}
+                >
+                  <Text style={styles.numberButtonText}>-</Text>
+                </TouchableOpacity>
+                <Text style={styles.numberDisplay}>{courseStructure.pagesPerLesson}</Text>
+                <TouchableOpacity 
+                  style={styles.numberButton}
+                  onPress={() => setCourseStructure(prev => ({ 
+                    ...prev, 
+                    pagesPerLesson: Math.min(10, prev.pagesPerLesson + 1) 
+                  }))}
+                >
+                  <Text style={styles.numberButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.structureSummary}>
+              <Text style={styles.summaryTitle}>Resumo da Estrutura:</Text>
+              <Text style={styles.summaryText}>
+                Total de elementos: {courseStructure.modulesCount * courseStructure.lessonsPerModule * courseStructure.pagesPerLesson * 15} grãos
+              </Text>
+              <Text style={styles.summaryText}>
+                Distribuídos em {courseStructure.modulesCount * courseStructure.lessonsPerModule * courseStructure.pagesPerLesson} páginas
+              </Text>
+            </View>
+
+            <View style={styles.structureActions}>
+              <TouchableOpacity 
+                style={styles.backButton}
+                onPress={() => setShowStructureForm(false)}
+              >
+                <Text style={styles.backButtonText}>Voltar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.confirmButton}
+                onPress={() => setShowStructureForm(false)}
+              >
+                <Text style={styles.confirmButtonText}>Confirmar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
 
-        <TouchableOpacity onPress={saveCourse} style={styles.saveButton}>
-          <Text style={styles.buttonText}>Guardar Curso</Text>
-        </TouchableOpacity>
+        {(!isNewCourse || !showStructureForm) && (
+          <>
+            <Text style={styles.label}>Título do Curso *</Text>
+            <TextInput style={styles.input} placeholder="Título do curso" value={title} onChangeText={setTitle} />
 
-        {!isNewCourse && (
-          <TouchableOpacity onPress={togglePublish} style={styles.publishButton}>
-            <Text style={styles.buttonText}>
-              {published ? 'Despublicar Curso' : 'Publicar Curso'}
-            </Text>
-          </TouchableOpacity>
-        )}
+            <Text style={styles.label}>Descrição</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Descrição do curso"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+            />
 
-        {!isNewCourse && (
-          <TouchableOpacity onPress={createModule} style={styles.addButton}>
-            <Text style={styles.addButtonText}>Adicionar Módulo</Text>
-          </TouchableOpacity>
+            <Text style={styles.label}>Imagem de Capa</Text>
+            <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
+              <Text style={styles.imageUploadText}>
+                {coverImageUrl ? 'Alterar Imagem de Capa' : 'Selecionar Imagem de Capa'}
+              </Text>
+            </TouchableOpacity>
+
+            {coverImageUrl && !imageLoadError ? (
+              <Image key={coverImageUrl} source={{ uri: coverImageUrl }} style={styles.imagePreview} onError={handleImageError} />
+            ) : (
+              <View style={[styles.imagePreviewContainer, styles.imagePlaceholder]}>
+                <Text style={styles.placeholderText}>
+                  {imageLoadError ? imageLoadError : 'Nenhuma imagem de capa selecionada'}
+                </Text>
+              </View>
+            )}
+
+            {!isNewCourse && (
+              <FlatList
+                data={modules}
+                keyExtractor={(item) => item.id}
+                renderItem={renderModuleItem}
+              />
+            )}
+
+            <TouchableOpacity onPress={saveCourse} style={styles.saveButton}>
+              <Text style={styles.buttonText}>Guardar Curso</Text>
+            </TouchableOpacity>
+
+            {!isNewCourse && (
+              <TouchableOpacity onPress={togglePublish} style={styles.publishButton}>
+                <Text style={styles.buttonText}>
+                  {published ? 'Despublicar Curso' : 'Publicar Curso'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {!isNewCourse && (
+              <TouchableOpacity onPress={createModule} style={styles.addButton}>
+                <Text style={styles.addButtonText}>Adicionar Módulo</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </View>
     </ScrollView>
@@ -525,5 +803,140 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 6,
     borderRadius: 4,
+  },
+  // Structure form styles
+  structurePrompt: {
+    backgroundColor: '#F8F9FA',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#DEE2E6',
+  },
+  structureTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 12,
+  },
+  structureDescription: {
+    fontSize: 14,
+    color: '#6C757D',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  structurePreview: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  previewText: {
+    fontSize: 14,
+    color: '#495057',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  configureButton: {
+    backgroundColor: '#007BFF',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  configureButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  structureForm: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  structureField: {
+    marginBottom: 20,
+  },
+  structureLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#495057',
+    marginBottom: 12,
+  },
+  numberInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  numberButton: {
+    backgroundColor: '#007BFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  numberButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  numberDisplay: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#212529',
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  structureSummary: {
+    backgroundColor: '#E3F2FD',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007BFF',
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 8,
+  },
+  summaryText: {
+    fontSize: 14,
+    color: '#495057',
+    marginBottom: 4,
+  },
+  structureActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  backButton: {
+    flex: 1,
+    backgroundColor: '#6C757D',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: '#28A745',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
