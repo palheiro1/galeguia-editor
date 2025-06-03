@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Button } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '../styles/designSystem';
+import { Card, Button as CustomButton } from '../components/UIComponents';
 
 const ProfileEditScreen = () => {
   const navigation = useNavigation();
@@ -21,20 +23,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#F8F9FA',
+    padding: SPACING.lg,
+    backgroundColor: COLORS.background,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '600',
-    marginBottom: 20,
-    color: '#212529',
+    ...TYPOGRAPHY.h2,
+    marginBottom: SPACING.lg,
+    color: COLORS.text.primary,
   },
   placeholderText: {
-    fontSize: 16,
-    color: '#6C757D',
+    ...TYPOGRAPHY.body,
+    color: COLORS.text.secondary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: SPACING.lg,
   },
 });
 

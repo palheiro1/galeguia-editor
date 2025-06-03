@@ -11,7 +11,10 @@ import {
   Platform,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { useIsFocused } from '@react-navigation/native'; // Add this import
+import { useIsFocused } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '../styles/designSystem';
+import { Card, Button, Input, Badge, IconButton, EmptyState } from '../components/UIComponents';
 
 // Definição do tipo do módulo
 type Module = {
@@ -385,129 +388,189 @@ export default function ModuleEditScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  // Container styles
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.background,
   },
+  
+  // Header styles
   header: {
-    padding: 16,
-    backgroundColor: '#fff',
+    padding: SPACING.lg,
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: COLORS.border,
+    ...SHADOWS.sm,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    ...TYPOGRAPHY.h2,
+    color: COLORS.text.primary,
   },
+  
+  // Form styles
   form: {
-    padding: 16,
+    padding: SPACING.lg,
+    backgroundColor: COLORS.surface,
+    margin: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    ...SHADOWS.sm,
   },
   label: {
-    fontSize: 16,
-    marginBottom: 6,
-    fontWeight: '500',
+    ...TYPOGRAPHY.body,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.primary,
+    marginBottom: SPACING.xs,
   },
   input: {
-    backgroundColor: '#fff',
-    padding: 12,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 4,
-    marginBottom: 16,
-    fontSize: 16,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.base,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.base,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.primary,
+    marginBottom: SPACING.base,
   },
+  
+  // Button styles
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: SPACING.lg,
+    gap: SPACING.sm,
   },
   button: {
-    padding: 12,
-    borderRadius: 4,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.base,
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    marginHorizontal: 4,
+    minHeight: 44,
   },
   buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.white,
   },
   cancelButton: {
-    backgroundColor: '#9aa0a6',
+    backgroundColor: COLORS.gray500,
   },
   saveButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: COLORS.primary,
   },
   deleteButton: {
-    backgroundColor: '#ea4335',
-    marginTop: 16,
+    backgroundColor: COLORS.error,
+    marginTop: SPACING.lg,
   },
   disabledButton: {
+    backgroundColor: COLORS.gray400,
     opacity: 0.6,
   },
+  addButton: {
+    backgroundColor: COLORS.success,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.base,
+  },
+  addButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+  },
+  deleteButtonContainer: {
+    marginTop: SPACING.lg,
+  },
+  
+  // Lessons section styles
   lessonsSection: {
     flex: 1,
-    padding: 16,
+    padding: SPACING.lg,
     paddingTop: 0,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    ...SHADOWS.sm,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    ...TYPOGRAPHY.h3,
+    color: COLORS.text.primary,
   },
-  addButton: {
-    backgroundColor: '#34a853',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
+  
+  // List styles
   list: {
-    paddingBottom: 20,
+    paddingBottom: SPACING.xl,
   },
-  emptyContainer: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
+  
+  // Lesson item styles (for backward compatibility)
   lessonItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 4,
-    marginBottom: 8,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: COLORS.border,
+    ...SHADOWS.sm,
   },
   lessonInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   lessonTitle: {
-    fontSize: 16,
-    fontWeight: '500',
+    ...TYPOGRAPHY.body,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.primary,
+    flex: 1,
   },
   lessonPosition: {
-    fontSize: 14,
-    color: '#555',
+    ...TYPOGRAPHY.caption,
+    color: COLORS.text.secondary,
+    backgroundColor: COLORS.gray100,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
   },
+  
+  // Empty state styles
+  emptyContainer: {
+    backgroundColor: COLORS.surface,
+    padding: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderStyle: 'dashed',
+  },
+  emptyText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+  },
+  
+  // Responsive styles
+  ...(Platform.OS === 'web' && {
+    containerWeb: {
+      maxWidth: 800,
+      alignSelf: 'center',
+      width: '100%',
+    },
+    formWeb: {
+      padding: SPACING.xl,
+    },
+  }),
 });

@@ -17,6 +17,9 @@ import { MediaTypeOptions } from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '../styles/designSystem';
+import { Card, Button, Input, Badge, IconButton } from '../components/UIComponents';
 
 // Definição de tipos
 
@@ -617,174 +620,208 @@ export default function CourseEditScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA', // Updated background
+    backgroundColor: COLORS.gray50,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: COLORS.gray50,
   },
-  header: {
-    // Removed as header is handled by navigator, but kept for potential future use or structure
-    // padding: 16,
-    // backgroundColor: '#FFFFFF',
-    // borderBottomWidth: 1,
-    // borderBottomColor: '#DEE2E6',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#212529',
+  scrollContent: {
+    padding: SPACING.lg,
+    gap: SPACING.lg,
   },
   form: {
-    padding: 20, // Increased padding
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
+    padding: SPACING.xl,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    ...SHADOWS.md,
   },
   label: {
-    fontSize: 16,
-    marginBottom: 8,
-    fontWeight: '500',
-    color: '#495057', // Darker gray for labels
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#CED4DA', // Standard border color
-    borderRadius: 8, // More rounded
-    marginBottom: 16,
-    fontSize: 16,
-    color: '#212529',
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    marginBottom: SPACING.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.gray700,
   },
   textArea: {
     height: 120,
     textAlignVertical: 'top',
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  buttonContainer: {
+    gap: SPACING.md,
+    marginTop: SPACING.lg,
   },
-  saveButton: {
-    backgroundColor: '#007BFF', // Primary blue
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10, // Adjusted margin
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  publishButton: {
-    backgroundColor: '#28A745', // Success green for publish
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 16,
+  imageSection: {
+    gap: SPACING.md,
   },
   imageUploadButton: {
-    backgroundColor: '#FFFFFF',
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#007BFF', // Primary blue border
+    backgroundColor: COLORS.white,
+    padding: SPACING.lg,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
     borderStyle: 'dashed',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
+    minHeight: 120,
+  },
+  imageUploadContent: {
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   imageUploadText: {
-    color: '#007BFF', // Primary blue text
-    fontWeight: '500',
-    fontSize: 15,
+    color: COLORS.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    textAlign: 'center',
+  },
+  imageUploadHint: {
+    color: COLORS.gray500,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    textAlign: 'center',
   },
   imagePreviewContainer: {
-    marginBottom: 16,
     alignItems: 'center',
+    gap: SPACING.sm,
   },
   imagePreview: {
     width: '100%',
-    height: 200, // Slightly taller
-    borderRadius: 8,
-    backgroundColor: '#E9ECEF', // Placeholder color
-  },
-  imagePlaceholder: {
     height: 200,
-    width: '100%',
-    backgroundColor: '#E9ECEF', // Light gray placeholder
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.gray100,
+  },
+  imageActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  // Structure section styles
+  structureSection: {
+    gap: SPACING.lg,
+  },
+  structurePrompt: {
+    backgroundColor: COLORS.blue50,
+    padding: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    borderColor: COLORS.blue200,
+  },
+  structureTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.gray900,
+    marginBottom: SPACING.md,
+  },
+  structureDescription: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.gray600,
+    marginBottom: SPACING.lg,
+    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.base,
+  },
+  structurePreview: {
+    backgroundColor: COLORS.white,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+  },
+  previewText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.gray700,
+    marginBottom: SPACING.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+  },
+  structureForm: {
+    backgroundColor: COLORS.white,
+    padding: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xl,
+    gap: SPACING.lg,
+  },
+  structureField: {
+    gap: SPACING.md,
+  },
+  structureLabel: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.gray700,
+  },
+  numberInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.lg,
+  },
+  numberButton: {
+    backgroundColor: COLORS.primary,
+    width: 44,
+    height: 44,
+    borderRadius: BORDER_RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#DEE2E6',
+    ...SHADOWS.sm,
   },
-  placeholderText: {
-    color: '#666',
+  numberButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+  },
+  numberDisplay: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.gray900,
+    minWidth: 60,
     textAlign: 'center',
-    padding: 10,
   },
+  structureSummary: {
+    backgroundColor: COLORS.blue50,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
+  },
+  summaryTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.gray900,
+    marginBottom: SPACING.sm,
+  },
+  summaryText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.gray700,
+    marginBottom: SPACING.xs,
+  },
+  structureActions: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  // Module list styles
   modulesSection: {
-    // This section might be part of the main form or separate.
-    // If separate, it would need its own card styling.
-    // For now, assuming it's within the main form's padding.
-    paddingTop: 0,
+    gap: SPACING.lg,
   },
   sectionHeader: {
-    // Styles for section headers if used (e.g., for Modules list)
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray200,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  addButton: {
-    backgroundColor: '#28A745', // Success green
-    paddingVertical: 10, // Consistent padding
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  emptyContainer: {
-    padding: 20,
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA', // Light background for empty state
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#DEE2E6',
-  },
-  emptyText: {
-    color: '#666',
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.gray900,
   },
   moduleList: {
-    paddingBottom: 16,
+    gap: SPACING.md,
   },
   moduleItem: {
-    backgroundColor: '#F8F9FA', // Slightly different background for list items
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 10,
+    backgroundColor: COLORS.white,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    ...SHADOWS.sm,
     borderWidth: 1,
-    borderColor: '#E9ECEF',
+    borderColor: COLORS.gray200,
   },
   moduleInfo: {
     flexDirection: 'row',
@@ -792,151 +829,136 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   moduleTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#212529',
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.gray900,
+    flex: 1,
   },
   modulePosition: {
-    fontSize: 12,
-    color: '#6C757D',
-    backgroundColor: '#E9ECEF',
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderRadius: 4,
+    backgroundColor: COLORS.gray200,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    marginLeft: SPACING.md,
   },
-  // Structure form styles
-  structurePrompt: {
-    backgroundColor: '#F8F9FA',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#DEE2E6',
+  modulePositionText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.gray600,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
-  structureTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 12,
-  },
-  structureDescription: {
-    fontSize: 14,
-    color: '#6C757D',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  structurePreview: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  previewText: {
-    fontSize: 14,
-    color: '#495057',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  configureButton: {
-    backgroundColor: '#007BFF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+  emptyContainer: {
+    padding: SPACING.xl,
     alignItems: 'center',
+    backgroundColor: COLORS.gray50,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 2,
+    borderColor: COLORS.gray200,
+    borderStyle: 'dashed',
   },
-  configureButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  structureForm: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  structureField: {
-    marginBottom: 20,
-  },
-  structureLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#495057',
-    marginBottom: 12,
-  },
-  numberInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-  },
-  numberButton: {
-    backgroundColor: '#007BFF',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  numberButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  numberDisplay: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#212529',
-    minWidth: 40,
+  emptyText: {
+    color: COLORS.gray500,
+    fontSize: TYPOGRAPHY.fontSize.base,
     textAlign: 'center',
   },
-  structureSummary: {
-    backgroundColor: '#E3F2FD',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007BFF',
+  // Missing styles for backward compatibility
+  header: {
+    // Empty style for backward compatibility
   },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 8,
+  input: {
+    backgroundColor: COLORS.white,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.gray300,
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.lg,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.gray900,
   },
-  summaryText: {
-    fontSize: 14,
-    color: '#495057',
-    marginBottom: 4,
+  imagePlaceholder: {
+    height: 200,
+    width: '100%',
+    backgroundColor: COLORS.gray100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 2,
+    borderColor: COLORS.gray300,
+    borderStyle: 'dashed',
   },
-  structureActions: {
-    flexDirection: 'row',
-    gap: 12,
+  placeholderText: {
+    color: COLORS.gray500,
+    textAlign: 'center',
+    fontSize: TYPOGRAPHY.fontSize.base,
+    padding: SPACING.lg,
+  },
+  buttonText: {
+    color: COLORS.white,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontSize: TYPOGRAPHY.fontSize.base,
+  },
+  saveButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    ...SHADOWS.sm,
+  },
+  publishButton: {
+    backgroundColor: COLORS.success,
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    ...SHADOWS.sm,
+  },
+  addButton: {
+    backgroundColor: COLORS.success,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    ...SHADOWS.sm,
+  },
+  addButtonText: {
+    color: COLORS.white,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontSize: TYPOGRAPHY.fontSize.base,
+  },
+  configureButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    ...SHADOWS.sm,
+  },
+  configureButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   backButton: {
     flex: 1,
-    backgroundColor: '#6C757D',
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.gray500,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   confirmButton: {
     flex: 1,
-    backgroundColor: '#28A745',
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.success,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
   },
   confirmButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
 });

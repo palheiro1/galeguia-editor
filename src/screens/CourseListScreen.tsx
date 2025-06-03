@@ -9,24 +9,15 @@ import {
   Alert,
   Platform,
   RefreshControl,
+  Dimensions,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-
-const COLORS = {
-  primary: '#6366f1',
-  secondary: '#4f46e5',
-  success: '#22c55e',
-  warning: '#eab308',
-  danger: '#ef4444',
-  background: '#f8fafc',
-  cardBackground: '#ffffff',
-  textPrimary: '#1e293b',
-  textSecondary: '#64748b',
-};
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS, LAYOUT } from '../styles/designSystem';
+import { Card, Button, Badge, EmptyState, ProgressBar } from '../components/UIComponents';
 
 type Course = {
   id: string;
@@ -54,8 +45,13 @@ export default function CourseListScreen({ navigation }: any) {
   const [loading, setLoading] = useState<boolean>(true);
   const { profile } = useAuth();
 
+
+
   const fetchCourses = async () => {
-    if (!profile) return;
+    if (!profile) {
+      return;
+    }
+    
     try {
       setLoading(true);
       let query = supabase.from('courses').select('*');
@@ -73,7 +69,10 @@ export default function CourseListScreen({ navigation }: any) {
 
       const { data, error } = await query.order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
+      
       if (data) {
         const coursesWithCompletion = await Promise.all(
           data.map(async (course: any) => {
@@ -247,6 +246,17 @@ export default function CourseListScreen({ navigation }: any) {
     }, [profile])
   );
 
+  // Safety timeout to ensure loading doesn't get stuck
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+      }
+    }, 10000);
+
+    return () => clearTimeout(timeout);
+  }, [loading]);
+
   const deleteCourse = async (id: string) => {
     const confirmMessage = 'Eliminar este curso? Isso não pode ser desfeito.';
     const performDelete = async () => {
@@ -273,99 +283,82 @@ export default function CourseListScreen({ navigation }: any) {
   const createNewCourse = () => navigation.navigate('CourseEdit', { courseId: null });
   const editCourse = (courseId: string) => navigation.navigate('CourseEdit', { courseId });
 
-  const renderCourseItem = ({ item }: { item: Course }) => (
-    <View style={styles.courseCard}>
-      <View style={styles.cardContent}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>{item.title}</Text>
-          <View style={[styles.statusBadge, item.published ? styles.publishedBadge : styles.draftBadge]}>
-            <MaterialIcons name={item.published ? 'public' : 'drafts'} size={14} color={item.published ? COLORS.success : COLORS.warning} />
-            <Text style={styles.statusText}>{item.published ? 'Publicado' : 'Rascunho'}</Text>
-          </View>
-        </View>
-        {item.description && <Text style={styles.cardDescription} numberOfLines={2}>{item.description}</Text>}
-        
-        {/* Completion Metrics */}
-        {item.completion && (
-          <View style={styles.completionContainer}>
-            <View style={styles.completionHeader}>
-              <Text style={styles.completionTitle}>Progresso do Curso</Text>
-              <Text style={styles.completionPercentage}>{item.completion.grains.percentage}%</Text>
-            </View>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${item.completion.grains.percentage}%` }]} />
-            </View>
-            <View style={styles.completionMetrics}>
-              <View style={styles.metricItem}>
-                <MaterialIcons name="folder" size={16} color={COLORS.textSecondary} />
-                <Text style={styles.metricText}>
-                  {item.completion.modules.current}/{item.completion.modules.total} módulos
-                </Text>
-              </View>
-              <View style={styles.metricItem}>
-                <MaterialIcons name="book" size={16} color={COLORS.textSecondary} />
-                <Text style={styles.metricText}>
-                  {item.completion.lessons.current}/{item.completion.lessons.total} lições
-                </Text>
-              </View>
-              <View style={styles.metricItem}>
-                <MaterialIcons name="description" size={16} color={COLORS.textSecondary} />
-                <Text style={styles.metricText}>
-                  {item.completion.pages.current}/{item.completion.pages.total} páginas
-                </Text>
-              </View>
-              <View style={styles.metricItem}>
-                <MaterialIcons name="grain" size={16} color={COLORS.textSecondary} />
-                <Text style={styles.metricText}>
-                  {item.completion.grains.current}/{item.completion.grains.total} grãos
-                </Text>
-              </View>
-            </View>
-          </View>
+  const renderCourseItem = ({ item }: { item: Course }) => {
+    return (
+      <View style={{
+        backgroundColor: 'white',
+        padding: 20,
+        margin: 10,
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+      }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
+          {item.title}
+        </Text>
+        {item.description && (
+          <Text style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
+            {item.description}
+          </Text>
         )}
-
-        {profile?.role === 'admin' && item.creator_username && (
-          <View style={styles.authorContainer}>
-            <MaterialIcons name="person" size={14} color={COLORS.textSecondary} />
-            <Text style={styles.authorText}>{item.creator_username}</Text>
-          </View>
-        )}
-        <View style={styles.cardFooter}>
-          <Text style={styles.createdDate}>Criado em: {new Date(item.created_at).toLocaleDateString()}</Text>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={[styles.iconButton, styles.editButton]} onPress={() => editCourse(item.id)}>
-              <MaterialIcons name="edit" size={18} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.iconButton, styles.deleteButton]} onPress={() => deleteCourse(item.id)}>
-              <MaterialIcons name="delete" size={18} color="white" />
-            </TouchableOpacity>
-          </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={{ fontSize: 12, color: '#999' }}>
+            Status: {item.published ? 'Publicado' : 'Rascunho'}
+          </Text>
+          <TouchableOpacity
+            style={{
+              backgroundColor: COLORS.primary,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 4,
+            }}
+            onPress={() => editCourse(item.id)}
+          >
+            <Text style={{ color: 'white', fontSize: 12 }}>Editar</Text>
+          </TouchableOpacity>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
       <LinearGradient colors={[COLORS.primary, COLORS.secondary]} style={styles.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
         <Text style={styles.headerTitle}>Meus Cursos</Text>
-        <TouchableOpacity style={styles.createButton} onPress={createNewCourse}>
-          <MaterialIcons name="add" size={24} color="white" />
-          <Text style={styles.createButtonText}>Novo Curso</Text>
-        </TouchableOpacity>
+        <Button
+          title="Novo Curso"
+          onPress={createNewCourse}
+          variant="ghost"
+          icon="add"
+          style={styles.createButton}
+          textStyle={styles.createButtonText}
+        />
       </LinearGradient>
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
       ) : courses.length === 0 ? (
-        <Text style={{ textAlign: 'center', color: COLORS.textSecondary, marginTop: 40 }}>Ainda não há cursos.</Text>
-      ) : (
-        <FlatList
-          data={courses}
-          renderItem={renderCourseItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchCourses} colors={[COLORS.primary]} />}
+        <EmptyState 
+          icon="school"
+          title="Nenhum curso encontrado"
+          description="Comece criando seu primeiro curso"
+          action={{
+            title: "Criar Curso",
+            onPress: createNewCourse
+          }}
         />
+      ) : (
+        <>
+          <FlatList
+            data={courses}
+            renderItem={renderCourseItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchCourses} colors={[COLORS.primary]} />}
+          />
+        </>
       )}
     </View>
   );
@@ -374,106 +367,83 @@ export default function CourseListScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.gray50,
   },
   header: {
-    paddingVertical: Platform.OS === 'web' ? 24 : 20,
-    paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-    marginBottom: 16,
+    paddingVertical: Platform.OS === 'web' ? SPACING.xl : SPACING.lg,
+    paddingHorizontal: SPACING.xl,
+    ...SHADOWS.md,
+    marginBottom: SPACING.lg,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 16,
+    fontSize: TYPOGRAPHY.fontSize['3xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.white,
+    marginBottom: SPACING.lg,
   },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING.sm,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
   createButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  },
+  list: {
+    paddingBottom: SPACING['2xl'],
+  },
+  // Grid layout for responsive design
+  gridContainer: {
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.lg,
   },
   courseCard: {
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    marginBottom: SPACING.lg,
+    ...SHADOWS.md,
+    overflow: 'hidden',
   },
   cardContent: {
-    padding: 20,
+    padding: SPACING.lg,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    flexShrink: 1,
-    marginRight: 12,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    gap: 4,
-  },
-  publishedBadge: {
-    backgroundColor: '#dcfce7',
-  },
-  draftBadge: {
-    backgroundColor: '#fef9c3',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.gray900,
+    flex: 1,
+    marginRight: SPACING.md,
+    lineHeight: TYPOGRAPHY.lineHeight.tight * TYPOGRAPHY.fontSize.xl,
   },
   cardDescription: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
-    marginBottom: 12,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.gray600,
+    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.base,
+    marginBottom: SPACING.md,
   },
   authorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
   },
   authorText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.gray500,
     fontStyle: 'italic',
   },
   cardFooter: {
@@ -481,21 +451,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
+    borderTopColor: COLORS.gray200,
+    paddingTop: SPACING.md,
   },
   createdDate: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.gray500,
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
   },
   iconButton: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -503,67 +473,96 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   deleteButton: {
-    backgroundColor: COLORS.danger,
-  },
-  list: {
-    paddingBottom: 40,
+    backgroundColor: COLORS.error,
   },
   // Completion metrics styles
   completionContainer: {
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    backgroundColor: COLORS.gray50,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.gray200,
   },
   completionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   completionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.gray900,
   },
   completionPercentage: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.primary,
   },
+  completionMetrics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  metricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    gap: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+  },
+  metricText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.gray600,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+  },
+  // Responsive styles
+  responsiveGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.lg,
+  },
+  responsiveCard: {
+    flex: Platform.OS === 'web' ? 0 : 1,
+    minWidth: Platform.OS === 'web' ? 300 : '100%',
+    maxWidth: Platform.OS === 'web' ? 400 : '100%',
+  },
+  // Status badge styles (for backward compatibility)
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    gap: SPACING.xs,
+  },
+  publishedBadge: {
+    backgroundColor: COLORS.successLight,
+  },
+  draftBadge: {
+    backgroundColor: COLORS.warningLight,
+  },
+  statusText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  },
+  // Progress bar styles (for backward compatibility)
   progressBar: {
     height: 6,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 3,
-    marginBottom: 12,
+    backgroundColor: COLORS.gray200,
+    borderRadius: BORDER_RADIUS.sm,
+    marginBottom: SPACING.md,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: COLORS.primary,
-    borderRadius: 3,
-  },
-  completionMetrics: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  metricItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  metricText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: '500',
+    borderRadius: BORDER_RADIUS.sm,
   },
 });

@@ -1,8 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, SafeAreaView } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, ICON_SIZES } from '../styles/designSystem';
+import { IconButton } from './UIComponents';
 
 // Assuming your RootStackParamList is defined in App.tsx or a types file
 type RootStackParamList = {
@@ -34,16 +37,31 @@ const TopBar = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.userInfo}>
-          <Text style={styles.username}>{displayName}</Text>
-          <Text style={styles.role}>{displayRole}</Text>
+          <View style={styles.userAvatar}>
+            <MaterialIcons name="account-circle" size={ICON_SIZES.xl} color={COLORS.primary} />
+          </View>
+          <View style={styles.userDetails}>
+            <Text style={styles.username}>{displayName}</Text>
+            <Text style={styles.role}>{displayRole}</Text>
+          </View>
         </View>
         <View style={styles.actions}>
-          <TouchableOpacity onPress={handleUpdateProfile} style={styles.button}>
-            <Text style={styles.buttonText}>Update Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={signOut} style={[styles.button, styles.signOutButton]}>
-            <Text style={styles.buttonText}>Sign Out</Text>
-          </TouchableOpacity>
+          <IconButton
+            icon="edit"
+            onPress={handleUpdateProfile}
+            size="sm"
+            backgroundColor={COLORS.gray100}
+            color={COLORS.textSecondary}
+            style={styles.actionButton}
+          />
+          <IconButton
+            icon="logout"
+            onPress={signOut}
+            size="sm"
+            backgroundColor={COLORS.error}
+            color={COLORS.white}
+            style={styles.actionButton}
+          />
         </View>
       </View>
     </SafeAreaView>
@@ -52,48 +70,48 @@ const TopBar = () => {
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#DEE2E6',
+    borderBottomColor: COLORS.borderLight,
+    ...SHADOWS.sm,
   },
   container: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Platform.OS === 'android' ? 12 : 10, // Adjust padding for Android status bar
-    paddingHorizontal: 15,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    backgroundColor: COLORS.surface,
   },
   userInfo: {
-    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  userAvatar: {
+    marginRight: SPACING.md,
+  },
+  userDetails: {
+    flex: 1,
   },
   username: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.textPrimary,
   },
   role: {
-    fontSize: 12,
-    color: '#6C757D',
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
     textTransform: 'capitalize',
+    marginTop: 2,
   },
   actions: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
-  button: {
-    marginLeft: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: '#007BFF',
-    borderRadius: 6,
-  },
-  signOutButton: {
-    backgroundColor: '#6C757D', // A more subtle color for sign out
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '500',
+  actionButton: {
+    marginLeft: 0,
   },
 });
 

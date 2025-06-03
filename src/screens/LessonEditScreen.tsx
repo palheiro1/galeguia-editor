@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Platform, FlatList } from 'react-native';
 import { supabase } from '../lib/supabase'; // Ensure this path is correct
 import { useRoute, useNavigation, useIsFocused, NavigationProp } from '@react-navigation/native';
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '../styles/designSystem';
+import { Card, Button as CustomButton, Input, Badge, IconButton, EmptyState } from '../components/UIComponents';
 
 // Define the types for route params and navigation
 type RootStackParamList = {
@@ -270,8 +272,8 @@ export default function LessonEditScreen() {
   if (isLoading && !isFocused && lessonId) { // Only show full screen loader if loading existing lesson data initially
     return (
       <View style={styles.centeredLoading}>
-        <ActivityIndicator size="large" color="#007bff" />
-        <Text>Carregando dados da lição...</Text>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Carregando dados da lição...</Text>
       </View>
     );
   }
@@ -321,7 +323,7 @@ export default function LessonEditScreen() {
       {lessonId && (
         <View style={styles.pagesSection}>
           <Text style={styles.sectionTitle}>Páginas da Lição</Text>
-          {isLoading && pages.length === 0 && <ActivityIndicator size="small" color="#007bff" />}
+          {isLoading && pages.length === 0 && <ActivityIndicator size="small" color={COLORS.primary} />}
           <FlatList
             data={pages}
             renderItem={renderPageItem}
@@ -345,77 +347,88 @@ export default function LessonEditScreen() {
 const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background,
   },
   container: {
-    padding: 20,
-    paddingBottom: 50, 
+    padding: SPACING.lg,
+    paddingBottom: SPACING['5xl'],
   },
   webContainer: {
-    padding: 20,
-    paddingBottom: 50, 
-    flexGrow: 1, 
+    padding: SPACING.lg,
+    paddingBottom: SPACING['5xl'],
+    flexGrow: 1,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#495057',
+    ...TYPOGRAPHY.label,
+    color: COLORS.text.primary,
+    marginBottom: SPACING.xs,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#ced4da',
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 15,
-    fontSize: 16,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.base,
+    padding: SPACING.md,
+    marginBottom: SPACING.base,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.primary,
+    ...SHADOWS.sm,
   },
   textArea: {
     minHeight: 120,
     textAlignVertical: 'top',
   },
   buttonContainer: {
-    marginTop: 10,
-    marginBottom: 10,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.md,
   },
   pagesSection: {
-    marginTop: 30,
+    marginTop: SPACING['2xl'],
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingTop: 20,
+    borderTopColor: COLORS.border,
+    paddingTop: SPACING.lg,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#343a40',
+    ...TYPOGRAPHY.h3,
+    color: COLORS.text.primary,
+    marginBottom: SPACING.base,
   },
   pageItem: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 5,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.base,
+    borderRadius: BORDER_RADIUS.base,
     borderWidth: 1,
-    borderColor: '#ddd',
-    marginBottom: 10,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.md,
+    ...SHADOWS.sm,
   },
   pageTitle: {
-    fontSize: 16,
-    color: '#007bff',
+    ...TYPOGRAPHY.body,
+    color: COLORS.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   emptyListText: {
+    ...TYPOGRAPHY.body,
     textAlign: 'center',
-    color: '#6c757d',
-    marginTop: 10,
+    color: COLORS.text.secondary,
+    marginTop: SPACING.md,
     fontStyle: 'italic',
   },
   addPageButtonContainer: {
-    marginTop: 15,
+    marginTop: SPACING.base,
   },
   centeredLoading: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.text.secondary,
+    marginTop: SPACING.sm,
   },
 });
