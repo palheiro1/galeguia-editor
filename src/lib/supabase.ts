@@ -13,9 +13,28 @@ const isWeb = typeof window !== 'undefined' && !!window.localStorage;
 
 const AsyncStorageAdapter = isWeb
   ? {
-      getItem: async (key: string) => window.localStorage.getItem(key),
-      setItem: async (key: string, value: string) => window.localStorage.setItem(key, value),
-      removeItem: async (key: string) => window.localStorage.removeItem(key),
+      getItem: async (key: string) => {
+        try {
+          return window.localStorage.getItem(key);
+        } catch (error) {
+          console.error('Error getting item from localStorage:', error);
+          return null;
+        }
+      },
+      setItem: async (key: string, value: string) => {
+        try {
+          window.localStorage.setItem(key, value);
+        } catch (error) {
+          console.error('Error setting item in localStorage:', error);
+        }
+      },
+      removeItem: async (key: string) => {
+        try {
+          window.localStorage.removeItem(key);
+        } catch (error) {
+          console.error('Error removing item from localStorage:', error);
+        }
+      },
     }
   : AsyncStorage;
 
@@ -24,6 +43,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: AsyncStorageAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: isWeb,
+    flowType: 'pkce',
+    storageKey: 'galeguia-auth',
   }
 });

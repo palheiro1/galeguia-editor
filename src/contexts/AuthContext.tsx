@@ -73,30 +73,60 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Set up auth state management
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      setSession(initialSession);
-      if (initialSession) {
-        refreshProfile();
+    let mounted = true;
+
+    // Get initial session with better error handling
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error fetching initial session:", error);
+          // Try to refresh the session if there's an error
+          const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+          if (mounted) {
+            setSession(refreshedSession);
+            if (refreshedSession) {
+              await refreshProfile();
+            }
+          }
+        } else {
+          if (mounted) {
+            setSession(initialSession);
+            if (initialSession) {
+              await refreshProfile();
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error in auth initialization:", error);
+        if (mounted) {
+          setSession(null);
+          setProfile(null);
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
-    }).catch(error => {
-      console.error("Error fetching initial session in AuthContext:", error);
-      setSession(null);
-      setProfile(null);
-      setIsLoading(false); // Ensure loading state is updated even on error
-    });
+    };
+
+    initializeAuth();
 
     // Set up listener for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        setSession(newSession);
+        console.log('Auth state changed:', event, !!newSession);
         
-        // Only refresh profile on specific events
-        if (newSession && ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
-          await refreshProfile();
-        } else if (!newSession) {
-          setProfile(null);
+        if (mounted) {
+          setSession(newSession);
+          
+          // Handle different auth events
+          if (newSession && ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
+            await refreshProfile();
+          } else if (!newSession && event === 'SIGNED_OUT') {
+            setProfile(null);
+          }
         }
       }
     );
@@ -105,6 +135,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         supabase.auth.startAutoRefresh();
+        // Try to refresh session when app becomes active
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (mounted && session) {
+            setSession(session);
+          }
+        }).catch(error => {
+          console.error('Error refreshing session on app active:', error);
+        });
       } else {
         supabase.auth.stopAutoRefresh();
       }
@@ -115,6 +153,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // Cleanup function
     return () => {
+      mounted = false;
       subscription.unsubscribe();
       appStateSubscription.remove();
       supabase.auth.stopAutoRefresh();

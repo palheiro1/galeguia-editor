@@ -15,6 +15,7 @@ import GrainEditScreen from './src/screens/GrainEditScreen'; // Import GrainEdit
 import PageTestScreen from './src/screens/PageTestScreen'; // Import PageTestScreen
 import Auth from './src/components/Auth';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 
 // Define the stack navigator types
@@ -42,22 +43,55 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // For Netlify and other web hosts, detect auth in URL
+    // For Netlify and other web hosts, detect auth in URL and handle session restoration
     const processAuthRedirect = async () => {
       try {
-        if (window.location.hash && window.location.hash.includes('access_token')) {
+        const currentUrl = window.location.href;
+        console.log('Processing auth redirect for URL:', currentUrl);
+
+        // Check if this is an auth callback URL
+        const isAuthCallback = currentUrl.includes('#access_token') || 
+                              currentUrl.includes('access_token=') ||
+                              currentUrl.includes('refresh_token=') ||
+                              currentUrl.includes('error=');
+
+        if (isAuthCallback) {
+          console.log('Detected auth callback, processing...');
+          
+          // Let Supabase handle the auth callback
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('Error processing auth callback:', error);
+          } else {
+            console.log('Auth callback processed successfully:', !!data.session);
+          }
+          
+          // Clean up the URL by removing hash parameters
           const cleanUrl = window.location.href.split('#')[0];
           window.history.replaceState(null, '', cleanUrl);
-          await supabase.auth.getSession();
+        } else {
+          // Just check if we have a valid session
+          console.log('No auth callback detected, checking existing session...');
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('Error checking session:', error);
+          } else {
+            console.log('Session check result:', !!data.session);
+          }
         }
       } catch (error) {
-        console.error("Error processing auth redirect in AuthRedirect:", error);
+        console.error("Error processing auth redirect:", error);
       } finally {
         setAuthChecked(true);
       }
     };
 
-    processAuthRedirect();
+    // Add a small delay to ensure DOM is ready
+    const timer = setTimeout(processAuthRedirect, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
   
   if (!authChecked && Platform.OS === 'web') {
@@ -176,11 +210,13 @@ function MainContent() {
 // Main App component with AuthProvider wrapper and AuthRedirect
 export default function App() {
   return (
-    <AuthRedirect>
-      <AuthProvider>
-        <MainContent />
-      </AuthProvider>
-    </AuthRedirect>
+    <ErrorBoundary>
+      <AuthRedirect>
+        <AuthProvider>
+          <MainContent />
+        </AuthProvider>
+      </AuthRedirect>
+    </ErrorBoundary>
   );
 }
 

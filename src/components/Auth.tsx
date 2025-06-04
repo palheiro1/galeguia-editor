@@ -105,6 +105,83 @@ export default function Auth() {
     }
   }
 
+  // Session recovery function
+  async function recoverSession() {
+    setLoading(true);
+    setErrorMsg(null);
+    
+    try {
+      console.log('Attempting session recovery...');
+      
+      // Try to refresh the current session
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('Session refresh failed:', error);
+        
+        // If refresh fails, try to get the session from storage
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session retrieval failed:', sessionError);
+          setErrorMsg('Session recovery failed. Please sign in again.');
+          Alert.alert('Session Recovery Failed', 'Unable to recover your session. Please sign in again.');
+        } else if (sessionData.session) {
+          console.log('Session recovered from storage');
+          Alert.alert('Session Recovered', 'Your session has been restored.');
+        } else {
+          setErrorMsg('No valid session found. Please sign in.');
+          Alert.alert('No Session Found', 'No valid session found. Please sign in.');
+        }
+      } else if (data.session) {
+        console.log('Session refreshed successfully');
+        Alert.alert('Session Recovered', 'Your session has been refreshed.');
+      }
+    } catch (err) {
+      console.error('Session recovery error:', err);
+      setErrorMsg('Session recovery failed. Please try signing in.');
+      Alert.alert('Recovery Error', 'Unable to recover session. Please try signing in.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Clear storage and reset
+  async function clearStorageAndReset() {
+    setLoading(true);
+    setErrorMsg(null);
+    
+    try {
+      console.log('Clearing storage and resetting...');
+      
+      // Sign out to clear any existing session
+      await supabase.auth.signOut();
+      
+      // For web, also clear localStorage
+      if (Platform.OS === 'web') {
+        try {
+          window.localStorage.removeItem('galeguia-auth');
+          Object.keys(window.localStorage).forEach(key => {
+            if (key.startsWith('supabase.auth.token')) {
+              window.localStorage.removeItem(key);
+            }
+          });
+        } catch (storageError) {
+          console.error('Error clearing localStorage:', storageError);
+        }
+      }
+      
+      setEmail('');
+      setPassword('');
+      Alert.alert('Storage Cleared', 'Authentication storage has been cleared. Please sign in again.');
+    } catch (err) {
+      console.error('Clear storage error:', err);
+      setErrorMsg('Failed to clear storage.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.formContainer}>
@@ -147,6 +224,29 @@ export default function Auth() {
             </Text>
           )}
         </TouchableOpacity>
+        
+        {/* Session Recovery Buttons - Only show on login screen */}
+        {isLogin && (
+          <View style={styles.recoveryContainer}>
+            <Text style={styles.recoveryTitle}>Having trouble signing in?</Text>
+            
+            <TouchableOpacity
+              style={[styles.button, styles.buttonSecondary]}
+              onPress={recoverSession}
+              disabled={loading}
+            >
+              <Text style={styles.buttonSecondaryText}>Recover Session</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.button, styles.buttonDanger]}
+              onPress={clearStorageAndReset}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>Clear Storage & Reset</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         
         <TouchableOpacity
           style={styles.switchButton}
@@ -219,12 +319,34 @@ const styles = StyleSheet.create({
   buttonPrimary: {
     backgroundColor: '#4285F4',
   },
+  buttonSecondary: {
+    backgroundColor: '#6c757d',
+  },
+  buttonDanger: {
+    backgroundColor: '#dc3545',
+  },
   buttonDisabled: {
     backgroundColor: '#a0c4ff',
   },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  buttonSecondaryText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  recoveryContainer: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  recoveryTitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 15,
   },
   switchButton: {
     marginTop: 15,
