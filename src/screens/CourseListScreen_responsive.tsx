@@ -54,19 +54,6 @@ export default function CourseListScreen({ navigation }: any) {
     return 1;
   };
 
-  const getCardWidth = () => {
-    if (Platform.OS !== 'web') return undefined;
-    const columns = getGridColumns();
-    if (columns === 1) return undefined;
-    
-    const containerPadding = SPACING.md * 2; // left and right padding
-    const gridRowPadding = SPACING.sm * 2; // left and right padding
-    const gapSpace = SPACING.md * (columns - 1); // gaps between cards
-    const availableWidth = screenWidth - containerPadding - gridRowPadding - gapSpace;
-    const cardWidth = availableWidth / columns;
-    return Math.floor(cardWidth);
-  };
-
   const fetchCourses = async () => {
     if (!profile) {
       return;
@@ -307,15 +294,9 @@ export default function CourseListScreen({ navigation }: any) {
     const completion = item.completion;
     const progressPercentage = completion?.grains?.percentage || 0;
     const authorName = item.creator_username || 'Autor Desconhecido';
-    const cardWidth = getCardWidth();
-    
-    const containerStyle = [
-      styles.courseCardContainer,
-      ...(cardWidth ? [{ width: cardWidth }] : [])
-    ];
     
     return (
-      <View style={containerStyle}>
+      <View style={styles.courseCardContainer}>
         <Card style={styles.courseCard}>
           {/* Course Image with Gradient Overlay */}
           <View style={styles.imageContainer}>
@@ -558,13 +539,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   gridRow: {
-    justifyContent: 'flex-start',
-    gap: SPACING.md,
+    justifyContent: 'space-between',
     paddingHorizontal: SPACING.sm,
   },
   // Course card container for responsive width
   courseCardContainer: {
-    // Removed margin for web as we use gap in gridRow
+    ...(Platform.OS === 'web' && {
+      flex: 1,
+      marginHorizontal: SPACING.sm,
+    }),
   },
   courseCard: {
     backgroundColor: COLORS.white,

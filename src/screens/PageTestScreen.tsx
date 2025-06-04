@@ -115,7 +115,7 @@ const PageTestScreen = () => {
         correct = answer === currentGrain.content.correctAnswer;
         break;
       case 'imagesToGuess':
-        correct = answer === currentGrain.content.correctWord;
+        correct = answer === currentGrain.content.correctImageUrl;
         break;
       case 'audioToGuess':
         correct = answer === currentGrain.content.correctAudioUrl;

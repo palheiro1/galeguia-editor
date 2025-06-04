@@ -18,8 +18,9 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '../styles/designSystem';
-import { Card, Button, Input, Badge, IconButton } from '../components/UIComponents';
+import { Card, Button, Input, Badge, IconButton, EmptyState } from '../components/UIComponents';
 
 // Definição de tipos
 
@@ -391,12 +392,18 @@ export default function CourseEditScreen({ route, navigation }: any) {
   };
 
   const renderModuleItem = ({ item }: { item: Module }) => (
-    <TouchableOpacity style={styles.moduleItem} onPress={() => editModule(item.id)}>
-      <View style={styles.moduleInfo}>
-        <Text style={styles.moduleTitle}>{item.title}</Text>
-        <Text style={styles.modulePosition}>Posição: {item.position}</Text>
-      </View>
-    </TouchableOpacity>
+    <Card style={styles.moduleCard}>
+      <TouchableOpacity style={styles.moduleContent} onPress={() => editModule(item.id)}>
+        <View style={styles.moduleHeader}>
+          <MaterialIcons name="folder" size={24} color={COLORS.primary} />
+          <View style={styles.moduleInfo}>
+            <Text style={styles.moduleTitle}>{item.title}</Text>
+            <Badge text={`Posição ${item.position}`} variant="info" style={styles.positionBadge} />
+          </View>
+          <MaterialIcons name="chevron-right" size={24} color={COLORS.gray400} />
+        </View>
+      </TouchableOpacity>
+    </Card>
   );
 
   const handleImageError = (error: any) => {
@@ -406,20 +413,43 @@ export default function CourseEditScreen({ route, navigation }: any) {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007BFF" />
+        <LinearGradient
+          colors={[COLORS.primary, COLORS.secondary]}
+          style={styles.loadingGradient}
+        >
+          <ActivityIndicator size="large" color={COLORS.white} />
+          <Text style={styles.loadingText}>
+            {isNewCourse ? 'Preparando curso...' : 'Carregando dados...'}
+          </Text>
+        </LinearGradient>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        {/* Header title is now handled by navigation options in App.tsx */}
-      </View>
+    <View style={styles.container}>
+      {/* Modern Gradient Header */}
+      <LinearGradient
+        colors={[COLORS.primary, COLORS.secondary]}
+        style={styles.gradientHeader}
+      >
+        <View style={styles.headerContent}>
+          <MaterialIcons name="school" size={32} color={COLORS.white} />
+          <Text style={styles.headerTitle}>
+            {isNewCourse ? 'Criar Curso' : 'Editar Curso'}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {isNewCourse 
+              ? 'Configure e crie seu novo curso'
+              : 'Gerencie conteúdo e módulos'
+            }
+          </Text>
+        </View>
+      </LinearGradient>
 
-      <View style={styles.form}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {isNewCourse && !showStructureForm && (
-          <View style={styles.structurePrompt}>
+          <Card style={styles.structurePrompt}>
             <Text style={styles.structureTitle}>Definir Estrutura do Curso</Text>
             <Text style={styles.structureDescription}>
               Para garantir consistência, defina primeiro a estrutura do seu curso:
@@ -438,95 +468,89 @@ export default function CourseEditScreen({ route, navigation }: any) {
                 ⚡ 15 Grãos por página (fixo)
               </Text>
             </View>
-            <TouchableOpacity 
-              style={styles.configureButton} 
+            <Button
+              title="Configurar Estrutura"
               onPress={() => setShowStructureForm(true)}
-            >
-              <Text style={styles.configureButtonText}>Configurar Estrutura</Text>
-            </TouchableOpacity>
-          </View>
+              icon="settings"
+              style={styles.configureButton}
+            />
+          </Card>
         )}
 
         {isNewCourse && showStructureForm && (
-          <View style={styles.structureForm}>
+          <Card style={styles.structureForm}>
             <Text style={styles.structureTitle}>Configurar Estrutura do Curso</Text>
             
             <View style={styles.structureField}>
               <Text style={styles.structureLabel}>Número de Módulos (recomendado: 10):</Text>
               <View style={styles.numberInputContainer}>
-                <TouchableOpacity 
-                  style={styles.numberButton}
+                <IconButton
+                  icon="remove"
                   onPress={() => setCourseStructure(prev => ({ 
                     ...prev, 
                     modulesCount: Math.max(1, prev.modulesCount - 1) 
                   }))}
-                >
-                  <Text style={styles.numberButtonText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.numberDisplay}>{courseStructure.modulesCount}</Text>
-                <TouchableOpacity 
                   style={styles.numberButton}
+                />
+                <Text style={styles.numberDisplay}>{courseStructure.modulesCount}</Text>
+                <IconButton
+                  icon="add"
                   onPress={() => setCourseStructure(prev => ({ 
                     ...prev, 
                     modulesCount: Math.min(20, prev.modulesCount + 1) 
                   }))}
-                >
-                  <Text style={styles.numberButtonText}>+</Text>
-                </TouchableOpacity>
+                  style={styles.numberButton}
+                />
               </View>
             </View>
 
             <View style={styles.structureField}>
               <Text style={styles.structureLabel}>Lições por Módulo (recomendado: 10):</Text>
               <View style={styles.numberInputContainer}>
-                <TouchableOpacity 
-                  style={styles.numberButton}
+                <IconButton
+                  icon="remove"
                   onPress={() => setCourseStructure(prev => ({ 
                     ...prev, 
                     lessonsPerModule: Math.max(1, prev.lessonsPerModule - 1) 
                   }))}
-                >
-                  <Text style={styles.numberButtonText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.numberDisplay}>{courseStructure.lessonsPerModule}</Text>
-                <TouchableOpacity 
                   style={styles.numberButton}
+                />
+                <Text style={styles.numberDisplay}>{courseStructure.lessonsPerModule}</Text>
+                <IconButton
+                  icon="add"
                   onPress={() => setCourseStructure(prev => ({ 
                     ...prev, 
                     lessonsPerModule: Math.min(20, prev.lessonsPerModule + 1) 
                   }))}
-                >
-                  <Text style={styles.numberButtonText}>+</Text>
-                </TouchableOpacity>
+                  style={styles.numberButton}
+                />
               </View>
             </View>
 
             <View style={styles.structureField}>
               <Text style={styles.structureLabel}>Páginas por Lição (recomendado: 4):</Text>
               <View style={styles.numberInputContainer}>
-                <TouchableOpacity 
-                  style={styles.numberButton}
+                <IconButton
+                  icon="remove"
                   onPress={() => setCourseStructure(prev => ({ 
                     ...prev, 
                     pagesPerLesson: Math.max(1, prev.pagesPerLesson - 1) 
                   }))}
-                >
-                  <Text style={styles.numberButtonText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.numberDisplay}>{courseStructure.pagesPerLesson}</Text>
-                <TouchableOpacity 
                   style={styles.numberButton}
+                />
+                <Text style={styles.numberDisplay}>{courseStructure.pagesPerLesson}</Text>
+                <IconButton
+                  icon="add"
                   onPress={() => setCourseStructure(prev => ({ 
                     ...prev, 
                     pagesPerLesson: Math.min(10, prev.pagesPerLesson + 1) 
                   }))}
-                >
-                  <Text style={styles.numberButtonText}>+</Text>
-                </TouchableOpacity>
+                  style={styles.numberButton}
+                />
               </View>
             </View>
 
-            <View style={styles.structureSummary}>
+            <Card style={styles.structureSummary}>
               <Text style={styles.summaryTitle}>Resumo da Estrutura:</Text>
               <Text style={styles.summaryText}>
                 Total de elementos: {courseStructure.modulesCount * courseStructure.lessonsPerModule * courseStructure.pagesPerLesson * 15} grãos
@@ -534,86 +558,152 @@ export default function CourseEditScreen({ route, navigation }: any) {
               <Text style={styles.summaryText}>
                 Distribuídos em {courseStructure.modulesCount * courseStructure.lessonsPerModule * courseStructure.pagesPerLesson} páginas
               </Text>
-            </View>
+            </Card>
 
             <View style={styles.structureActions}>
-              <TouchableOpacity 
-                style={styles.backButton}
+              <Button
+                title="Voltar"
+                variant="outline"
                 onPress={() => setShowStructureForm(false)}
-              >
-                <Text style={styles.backButtonText}>Voltar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.confirmButton}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Confirmar"
                 onPress={() => setShowStructureForm(false)}
-              >
-                <Text style={styles.confirmButtonText}>Confirmar</Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
             </View>
-          </View>
+          </Card>
         )}
 
         {(!isNewCourse || !showStructureForm) && (
-          <>
-            <Text style={styles.label}>Título do Curso *</Text>
-            <TextInput style={styles.input} placeholder="Título do curso" value={title} onChangeText={setTitle} />
+          <Card style={styles.form}>
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>Informações Básicas</Text>
+              
+              <Input
+                label="Título do Curso *"
+                placeholder="Título do curso"
+                value={title}
+                onChangeText={setTitle}
+              />
 
-            <Text style={styles.label}>Descrição</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Descrição do curso"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={4}
-            />
+              <Input
+                label="Descrição"
+                placeholder="Descrição do curso"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                numberOfLines={4}
+                style={styles.textArea}
+              />
+            </View>
 
-            <Text style={styles.label}>Imagem de Capa</Text>
-            <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
-              <Text style={styles.imageUploadText}>
-                {coverImageUrl ? 'Alterar Imagem de Capa' : 'Selecionar Imagem de Capa'}
-              </Text>
-            </TouchableOpacity>
-
-            {coverImageUrl && !imageLoadError ? (
-              <Image key={coverImageUrl} source={{ uri: coverImageUrl }} style={styles.imagePreview} onError={handleImageError} />
-            ) : (
-              <View style={[styles.imagePreviewContainer, styles.imagePlaceholder]}>
-                <Text style={styles.placeholderText}>
-                  {imageLoadError ? imageLoadError : 'Nenhuma imagem de capa selecionada'}
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>Imagem de Capa</Text>
+              <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
+                <MaterialIcons name="cloud-upload" size={32} color={COLORS.primary} />
+                <Text style={styles.imageUploadText}>
+                  {coverImageUrl ? 'Alterar Imagem de Capa' : 'Selecionar Imagem de Capa'}
                 </Text>
+                <Text style={styles.imageUploadHint}>
+                  Formato recomendado: 16:9 (1920x1080px)
+                </Text>
+              </TouchableOpacity>
+
+              {coverImageUrl && !imageLoadError ? (
+                <View style={styles.imagePreviewContainer}>
+                  <Image 
+                    key={coverImageUrl} 
+                    source={{ uri: coverImageUrl }} 
+                    style={styles.imagePreview} 
+                    onError={handleImageError} 
+                  />
+                  <View style={styles.imageActions}>
+                    <Button
+                      title="Alterar"
+                      variant="outline"
+                      onPress={pickImage}
+                      icon="edit"
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View style={[styles.imagePreviewContainer, styles.imagePlaceholder]}>
+                  <MaterialIcons name="image" size={48} color={COLORS.gray400} />
+                  <Text style={styles.placeholderText}>
+                    {imageLoadError ? imageLoadError : 'Nenhuma imagem de capa selecionada'}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {!isNewCourse && modules.length > 0 && (
+              <View style={styles.formSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Módulos do Curso</Text>
+                  <Badge text={`${modules.length} módulos`} variant="info" />
+                </View>
+                
+                <FlatList
+                  data={modules}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderModuleItem}
+                  style={styles.moduleList}
+                  scrollEnabled={false}
+                  ItemSeparatorComponent={() => <View style={{ height: SPACING.md }} />}
+                />
               </View>
             )}
 
-            {!isNewCourse && (
-              <FlatList
-                data={modules}
-                keyExtractor={(item) => item.id}
-                renderItem={renderModuleItem}
+            {!isNewCourse && modules.length === 0 && (
+              <Card style={styles.emptyContainer}>
+                <EmptyState 
+                  icon="folder-open"
+                  title="Nenhum módulo encontrado"
+                  description="Comece adicionando seu primeiro módulo ao curso"
+                  action={{
+                    title: "Adicionar Módulo",
+                    onPress: createModule
+                  }}
+                />
+              </Card>
+            )}
+
+            <View style={styles.buttonContainer}>
+              <Button
+                title={isSaving ? "Guardando..." : "Guardar Curso"}
+                onPress={saveCourse}
+                disabled={isSaving}
+                loading={isSaving}
+                icon="save"
+                size="lg"
               />
-            )}
 
-            <TouchableOpacity onPress={saveCourse} style={styles.saveButton}>
-              <Text style={styles.buttonText}>Guardar Curso</Text>
-            </TouchableOpacity>
+              {!isNewCourse && (
+                <Button
+                  title={published ? 'Despublicar Curso' : 'Publicar Curso'}
+                  onPress={togglePublish}
+                  variant={published ? 'outline' : 'primary'}
+                  icon={published ? 'visibility-off' : 'visibility'}
+                  size="lg"
+                />
+              )}
 
-            {!isNewCourse && (
-              <TouchableOpacity onPress={togglePublish} style={styles.publishButton}>
-                <Text style={styles.buttonText}>
-                  {published ? 'Despublicar Curso' : 'Publicar Curso'}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {!isNewCourse && (
-              <TouchableOpacity onPress={createModule} style={styles.addButton}>
-                <Text style={styles.addButtonText}>Adicionar Módulo</Text>
-              </TouchableOpacity>
-            )}
-          </>
+              {!isNewCourse && (
+                <Button
+                  title="Adicionar Módulo"
+                  onPress={createModule}
+                  variant="outline"
+                  icon="add"
+                  size="lg"
+                />
+              )}
+            </View>
+          </Card>
         )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -627,6 +717,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.gray50,
+  },
+  loadingGradient: {
+    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xl,
+    alignItems: 'center',
+    gap: SPACING.md,
+    ...SHADOWS.lg,
+  },
+  loadingText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    textAlign: 'center',
   },
   scrollContent: {
     padding: SPACING.lg,
@@ -674,11 +778,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     fontSize: TYPOGRAPHY.fontSize.base,
-    textAlign: 'center',
-  },
-  imageUploadHint: {
-    color: COLORS.gray500,
-    fontSize: TYPOGRAPHY.fontSize.sm,
     textAlign: 'center',
   },
   imagePreviewContainer: {
@@ -807,11 +906,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray200,
   },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.gray900,
-  },
   moduleList: {
     gap: SPACING.md,
   },
@@ -824,9 +918,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.gray200,
   },
   moduleInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flex: 1,
+    gap: SPACING.xs,
   },
   moduleTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
@@ -960,5 +1053,69 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  },
+  // Modern module card styles
+  moduleCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    ...SHADOWS.md,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    overflow: 'hidden',
+  },
+  moduleContent: {
+    padding: SPACING.lg,
+  },
+  moduleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  positionBadge: {
+    alignSelf: 'flex-start',
+  },
+  // Modern gradient header styles
+  gradientHeader: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
+  },
+  headerContent: {
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  headerTitle: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.white,
+    opacity: 0.9,
+    textAlign: 'center',
+  },
+  // Scroll view styles
+  scrollView: {
+    flex: 1,
+  },
+  // Form section styles
+  formSection: {
+    gap: SPACING.lg,
+    marginBottom: SPACING.xl,
+  },
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.gray900,
+    marginBottom: SPACING.md,
+  },
+  // Enhanced image upload styles
+  imageUploadHint: {
+    color: COLORS.gray500,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    textAlign: 'center',
+    marginTop: SPACING.xs,
   },
 });
