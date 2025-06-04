@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Image,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { Audio } from 'expo-av';
@@ -59,6 +60,15 @@ const PageTestScreen = () => {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [matchedPairs, setMatchedPairs] = useState<string[]>([]);
   const [selectedPairItem, setSelectedPairItem] = useState<string | null>(null);
+  const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'));
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenDimensions(window);
+    });
+
+    return () => subscription?.remove();
+  }, []);
 
   useEffect(() => {
     loadGrains();
@@ -280,17 +290,23 @@ const PageTestScreen = () => {
   const renderImagesToGuessGrain = (grain: Grain) => {
     const { correctImageUrl, falseImageUrls, correctWord } = grain.content;
     const images = [correctImageUrl, ...falseImageUrls].sort(() => Math.random() - 0.5);
+    const isLandscape = screenDimensions.width > screenDimensions.height;
+    const isTablet = screenDimensions.width > 768;
     
     return (
       <View style={styles.grainContainer}>
         <Text style={styles.grainTitle}>Qual imagem representa: {correctWord}?</Text>
         
-        <View style={styles.imagesContainer}>
+        <View style={[
+          styles.imagesContainer,
+          isLandscape && isTablet && styles.imagesContainerLandscape
+        ]}>
           {images.map((imageUrl, index) => (
             <TouchableOpacity
               key={index}
               style={[
                 styles.imageOption,
+                isLandscape && isTablet ? styles.imageOptionLandscape : styles.imageOptionPortrait,
                 selectedAnswer === imageUrl && (isCorrect ? styles.correctOption : styles.incorrectOption)
               ]}
               onPress={() => handleAnswer(imageUrl)}
@@ -366,6 +382,8 @@ const PageTestScreen = () => {
   const renderPairsGrain = (grain: Grain) => {
     const { pairs } = grain.content;
     const isPairsOfImage = grain.type === 'pairsOfImage';
+    const isLandscape = screenDimensions.width > screenDimensions.height;
+    const isTablet = screenDimensions.width > 768;
     
     // Create shuffled items for matching
     const leftItems: PairItem[] = pairs.map((pair: any, index: number) => ({
@@ -386,8 +404,14 @@ const PageTestScreen = () => {
       <View style={styles.grainContainer}>
         <Text style={styles.grainTitle}>Associe os pares:</Text>
         
-        <View style={styles.pairsContainer}>
-          <View style={styles.pairsColumn}>
+        <View style={[
+          styles.pairsContainer,
+          !isLandscape && styles.pairsContainerVertical
+        ]}>
+          <View style={[
+            styles.pairsColumn,
+            !isLandscape && styles.pairsColumnVertical
+          ]}>
             <Text style={styles.columnTitle}>Lado A</Text>
             {leftItems.map((item: PairItem, index: number) => (
               <TouchableOpacity
@@ -409,7 +433,10 @@ const PageTestScreen = () => {
             ))}
           </View>
           
-          <View style={styles.pairsColumn}>
+          <View style={[
+            styles.pairsColumn,
+            !isLandscape && styles.pairsColumnVertical
+          ]}>
             <Text style={styles.columnTitle}>Lado B</Text>
             {rightItems.map((item: PairItem, index: number) => (
               <TouchableOpacity
@@ -561,47 +588,65 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.h2,
     color: COLORS.text.primary,
     marginBottom: SPACING.sm,
+    textAlign: 'center',
   },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
   },
   progressText: {
     ...TYPOGRAPHY.body,
     color: COLORS.text.secondary,
+    fontSize: Math.min(TYPOGRAPHY.fontSize.base, 16),
   },
   scoreText: {
     ...TYPOGRAPHY.body,
     color: COLORS.primary,
     fontWeight: '600',
+    fontSize: Math.min(TYPOGRAPHY.fontSize.base, 16),
   },
   grainContainer: {
     backgroundColor: COLORS.surface,
     margin: SPACING.base,
+    marginHorizontal: Platform.OS === 'web' ? SPACING.lg : SPACING.base,
     padding: SPACING.lg,
     borderRadius: BORDER_RADIUS.lg,
     ...SHADOWS.base,
+    maxWidth: Platform.OS === 'web' ? 1200 : '100%',
+    alignSelf: 'center',
+    width: '100%',
   },
   grainTitle: {
     ...TYPOGRAPHY.h3,
     color: COLORS.text.primary,
     marginBottom: SPACING.base,
+    textAlign: 'center',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.lg, 18),
   },
   phrase: {
     ...TYPOGRAPHY.body,
     color: COLORS.text.primary,
     marginBottom: SPACING.lg,
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.base,
+    textAlign: 'center',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.base, 16),
   },
   question: {
     ...TYPOGRAPHY.body,
     color: COLORS.text.primary,
     marginBottom: SPACING.lg,
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.base,
+    textAlign: 'center',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.base, 16),
   },
   optionsContainer: {
     gap: SPACING.md,
+    maxWidth: 600,
+    alignSelf: 'center',
+    width: '100%',
   },
   optionButton: {
     backgroundColor: COLORS.gray50,
@@ -610,11 +655,13 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.base,
     borderWidth: 1,
     borderColor: COLORS.border,
+    minHeight: 48, // Better touch target
   },
   optionText: {
     ...TYPOGRAPHY.body,
     color: COLORS.text.primary,
     textAlign: 'center',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.base, 16),
   },
   correctOption: {
     backgroundColor: COLORS.successLight,
@@ -629,6 +676,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     gap: SPACING.md,
+    maxWidth: 800,
+    alignSelf: 'center',
+  },
+  imagesContainerLandscape: {
+    justifyContent: 'center',
+    gap: SPACING.lg,
   },
   imageOption: {
     width: '48%',
@@ -637,6 +690,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     overflow: 'hidden',
+    minWidth: 140,
+    maxWidth: 200,
+  },
+  imageOptionPortrait: {
+    width: '48%',
+    minWidth: 140,
+    maxWidth: 180,
+  },
+  imageOptionLandscape: {
+    width: '23%',
+    minWidth: 160,
+    maxWidth: 180,
   },
   optionImage: {
     width: '100%',
@@ -645,10 +710,13 @@ const styles = StyleSheet.create({
   },
   mainImage: {
     width: '100%',
-    height: 200,
+    height: Math.min(Dimensions.get('window').width * 0.6, 300),
+    maxHeight: 300,
     borderRadius: BORDER_RADIUS.base,
     marginBottom: SPACING.lg,
     resizeMode: 'cover',
+    alignSelf: 'center',
+    maxWidth: 500,
   },
   audioOptionButton: {
     backgroundColor: COLORS.blue50,
@@ -658,18 +726,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.blue500,
     alignItems: 'center',
+    minHeight: 48, // Better touch target
   },
   audioOptionText: {
     ...TYPOGRAPHY.body,
     color: COLORS.blue600,
     fontWeight: '500',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.base, 16),
   },
   pairsContainer: {
     flexDirection: 'row',
     gap: SPACING.base,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  pairsContainerVertical: {
+    flexDirection: 'column',
+    gap: SPACING.lg,
   },
   pairsColumn: {
     flex: 1,
+    minWidth: 0, // Allow text to wrap properly
+  },
+  pairsColumnVertical: {
+    flex: 0,
+    width: '100%',
   },
   columnTitle: {
     ...TYPOGRAPHY.body,
@@ -677,6 +759,7 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
     marginBottom: SPACING.md,
     textAlign: 'center',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.base, 16),
   },
   pairItem: {
     backgroundColor: COLORS.gray50,
@@ -701,6 +784,7 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.bodySmall,
     color: COLORS.text.primary,
     textAlign: 'center',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.sm, 14),
   },
   pairImage: {
     width: 40,
@@ -710,9 +794,13 @@ const styles = StyleSheet.create({
   },
   resultContainer: {
     margin: SPACING.base,
+    marginHorizontal: Platform.OS === 'web' ? SPACING.lg : SPACING.base,
     padding: SPACING.base,
     borderRadius: BORDER_RADIUS.base,
     alignItems: 'center',
+    maxWidth: Platform.OS === 'web' ? 1200 : '100%',
+    alignSelf: 'center',
+    width: '100%',
   },
   correctResult: {
     backgroundColor: COLORS.successLight,
@@ -727,14 +815,21 @@ const styles = StyleSheet.create({
   resultText: {
     ...TYPOGRAPHY.h3,
     marginBottom: SPACING.xs,
+    fontSize: Math.max(TYPOGRAPHY.fontSize.lg, 18),
   },
   correctAnswerText: {
     ...TYPOGRAPHY.bodySmall,
     color: COLORS.text.secondary,
+    textAlign: 'center',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.sm, 14),
   },
   buttonContainer: {
     padding: SPACING.base,
+    paddingHorizontal: Platform.OS === 'web' ? SPACING.lg : SPACING.base,
     gap: SPACING.md,
+    maxWidth: Platform.OS === 'web' ? 1200 : '100%',
+    alignSelf: 'center',
+    width: '100%',
   },
   nextButton: {
     backgroundColor: COLORS.primary,
@@ -742,11 +837,13 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.base,
     alignItems: 'center',
     ...SHADOWS.base,
+    minHeight: 48, // Better touch target
   },
   nextButtonText: {
     ...TYPOGRAPHY.label,
     color: COLORS.white,
     fontWeight: 'bold',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.base, 16),
   },
   finishButton: {
     backgroundColor: COLORS.gray600,
@@ -754,11 +851,13 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.base,
     alignItems: 'center',
     ...SHADOWS.base,
+    minHeight: 48, // Better touch target
   },
   finishButtonText: {
     ...TYPOGRAPHY.label,
     color: COLORS.white,
     fontWeight: 'bold',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.base, 16),
   },
   backButton: {
     backgroundColor: COLORS.primary,
@@ -767,11 +866,13 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.base,
     alignItems: 'center',
     ...SHADOWS.base,
+    minHeight: 48, // Better touch target
   },
   backButtonText: {
     ...TYPOGRAPHY.label,
     color: COLORS.white,
     fontWeight: 'bold',
+    fontSize: Math.max(TYPOGRAPHY.fontSize.base, 16),
   },
 });
 
