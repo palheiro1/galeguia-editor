@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
 import { supabase } from '../lib/supabase';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '../styles/designSystem';
 import { Card, Button, Input, Badge, IconButton, EmptyState } from '../components/UIComponents';
@@ -948,6 +949,41 @@ const GrainEditScreen = () => {
     </View>
   );
 
+  // Audio playback state
+  const [playingAudio, setPlayingAudio] = useState<string | null>(null);
+  const [soundObj, setSoundObj] = useState<Audio.Sound | null>(null);
+
+  // Cleanup sound on unmount
+  useEffect(() => {
+    return () => {
+      if (soundObj) {
+        soundObj.unloadAsync();
+      }
+    };
+  }, [soundObj]);
+
+  // Play audio helper
+  const playAudio = async (url: string) => {
+    try {
+      if (soundObj) {
+        await soundObj.unloadAsync();
+        setSoundObj(null);
+      }
+      const { sound } = await Audio.Sound.createAsync({ uri: url });
+      setSoundObj(sound);
+      setPlayingAudio(url);
+      await sound.playAsync();
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded || status.didJustFinish) {
+          setPlayingAudio(null);
+        }
+      });
+    } catch (e) {
+      setPlayingAudio(null);
+      Alert.alert('Erro', 'Erro ao reproduzir áudio');
+    }
+  };
+
   const renderAudioToGuessEditor = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Áudio para Adivinhar</Text>
@@ -964,30 +1000,55 @@ const GrainEditScreen = () => {
       />
 
       <Text style={styles.label}>Áudio Correto:</Text>
-      <TouchableOpacity
-        style={styles.imageButton}
-        onPress={() => pickAudio((url) => setAudioToGuessContent({...audioToGuessContent, correctAudioUrl: url}))}
-      >
-        <Text style={styles.imageButtonText}>
-          {audioToGuessContent.correctAudioUrl ? 'Alterar Áudio Correto' : 'Selecionar Áudio Correto'}
-        </Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+        <TouchableOpacity
+          style={styles.imageButton}
+          onPress={() => pickAudio((url) => setAudioToGuessContent({...audioToGuessContent, correctAudioUrl: url}))}
+        >
+          <Text style={styles.imageButtonText}>
+            {audioToGuessContent.correctAudioUrl ? 'Alterar Áudio Correto' : 'Selecionar Áudio Correto'}
+          </Text>
+        </TouchableOpacity>
+        {audioToGuessContent.correctAudioUrl ? (
+          <TouchableOpacity
+            style={[styles.playAudioButton, playingAudio === audioToGuessContent.correctAudioUrl && styles.playingAudioButton]}
+            onPress={() => playAudio(audioToGuessContent.correctAudioUrl)}
+            disabled={!audioToGuessContent.correctAudioUrl}
+          >
+            <Text style={styles.playAudioButtonText}>
+              {playingAudio === audioToGuessContent.correctAudioUrl ? 'Reproduzindo...' : '▶️ Ouvir'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       <Text style={styles.label}>Áudios Falsos:</Text>
       {audioToGuessContent.falseAudioUrls.map((url, index) => (
-        <TouchableOpacity
-          key={index}
-          style={styles.imageButton}
-          onPress={() => pickAudio((newUrl) => {
-            const newUrls = [...audioToGuessContent.falseAudioUrls];
-            newUrls[index] = newUrl;
-            setAudioToGuessContent({...audioToGuessContent, falseAudioUrls: newUrls as [string, string, string]});
-          })}
-        >
-          <Text style={styles.imageButtonText}>
-            {url ? `Alterar Áudio Falso ${index + 1}` : `Selecionar Áudio Falso ${index + 1}`}
-          </Text>
-        </TouchableOpacity>
+        <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+          <TouchableOpacity
+            style={styles.imageButton}
+            onPress={() => pickAudio((newUrl) => {
+              const newUrls = [...audioToGuessContent.falseAudioUrls];
+              newUrls[index] = newUrl;
+              setAudioToGuessContent({...audioToGuessContent, falseAudioUrls: newUrls as [string, string, string]});
+            })}
+          >
+            <Text style={styles.imageButtonText}>
+              {url ? `Alterar Áudio Falso ${index + 1}` : `Selecionar Áudio Falso ${index + 1}`}
+            </Text>
+          </TouchableOpacity>
+          {url ? (
+            <TouchableOpacity
+              style={[styles.playAudioButton, playingAudio === url && styles.playingAudioButton]}
+              onPress={() => playAudio(url)}
+              disabled={!url}
+            >
+              <Text style={styles.playAudioButtonText}>
+                {playingAudio === url ? 'Reproduzindo...' : '▶️ Ouvir'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       ))}
     </View>
   );
@@ -1221,6 +1282,21 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   // Enforcement styles
+  playAudioButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.base,
+    borderRadius: BORDER_RADIUS.base,
+    marginLeft: SPACING.base,
+  },
+  playingAudioButton: {
+    backgroundColor: COLORS.success,
+  },
+  playAudioButtonText: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+    fontSize: TYPOGRAPHY.fontSize.sm,
+  },
   enforcementWarning: {
     backgroundColor: COLORS.warningLight,
     borderColor: COLORS.warning,

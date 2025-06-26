@@ -352,27 +352,34 @@ const PageTestScreen = () => {
   const renderAudioToGuessGrain = (grain: Grain) => {
     const { correctWord, correctAudioUrl, falseAudioUrls } = grain.content;
     const audioOptions = [correctAudioUrl, ...falseAudioUrls].sort(() => Math.random() - 0.5);
-    
+
     return (
       <View style={styles.grainContainer}>
         <Text style={styles.grainTitle}>Qual áudio corresponde a: {correctWord}?</Text>
-        
+
         <View style={styles.optionsContainer}>
           {audioOptions.map((audioUrl, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.audioOptionButton,
-                selectedAnswer === audioUrl && (isCorrect ? styles.correctOption : styles.incorrectOption)
-              ]}
-              onPress={() => {
-                playAudio(audioUrl);
-                handleAnswer(audioUrl);
-              }}
-              disabled={showResult}
-            >
-              <Text style={styles.audioOptionText}>🔊 Áudio {index + 1}</Text>
-            </TouchableOpacity>
+            <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <TouchableOpacity
+                style={styles.audioPlayButton}
+                onPress={() => playAudio(audioUrl)}
+                disabled={showResult}
+                accessibilityLabel={`Reproduzir áudio ${index + 1}`}
+              >
+                <Text style={styles.audioPlayButtonText}>▶️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.audioOptionButton,
+                  selectedAnswer === audioUrl && (isCorrect ? styles.correctOption : styles.incorrectOption)
+                ]}
+                onPress={() => handleAnswer(audioUrl)}
+                disabled={showResult}
+                accessibilityLabel={`Selecionar áudio ${index + 1}`}
+              >
+                <Text style={styles.audioOptionText}>Áudio {index + 1}</Text>
+              </TouchableOpacity>
+            </View>
           ))}
         </View>
       </View>
@@ -556,6 +563,25 @@ const PageTestScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  audioPlayButton: {
+    backgroundColor: COLORS.blue100,
+    paddingVertical: SPACING.base,
+    paddingHorizontal: SPACING.base,
+    borderRadius: BORDER_RADIUS.base,
+    borderWidth: 1,
+    borderColor: COLORS.blue300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+    minWidth: 44,
+    minHeight: 44,
+  },
+  audioPlayButtonText: {
+    fontSize: 22,
+    color: COLORS.blue600,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
