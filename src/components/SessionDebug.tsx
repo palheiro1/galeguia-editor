@@ -35,7 +35,7 @@ export function SessionDebug({ visible = false }: SessionDebugProps) {
         
         setDebugInfo(info);
       } catch (error) {
-        setDebugInfo({ error: error.message, timestamp: new Date().toISOString() });
+        setDebugInfo({ error: error instanceof Error ? error.message : String(error), timestamp: new Date().toISOString() });
       }
     };
 

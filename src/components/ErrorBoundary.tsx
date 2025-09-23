@@ -1,6 +1,7 @@
 import React, { Component, ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING } from '../styles/designSystem';
+import { SecurityLogger } from '../lib/security';
 
 interface Props {
   children: ReactNode;
@@ -9,7 +10,7 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error?: Error;
+  error?: Error | undefined;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -24,6 +25,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    
+    // Log security event for monitoring
+    SecurityLogger.logSecurityEvent({
+      type: 'suspicious_activity',
+      details: {
+        error: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+      },
+      severity: 'high',
+    });
   }
 
   handleRetry = () => {
