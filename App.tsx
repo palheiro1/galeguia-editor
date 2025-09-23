@@ -7,12 +7,17 @@ import ProfileEditScreen from './src/screens/ProfileEditScreen'; // Import the n
 import TopBar from './src/components/TopBar'; // Import the TopBar component
 import { supabase } from './src/lib/supabase'; // Import supabase
 import CourseListScreen from './src/screens/CourseListScreen';
+import ModernCourseListScreen from './src/screens/ModernCourseListScreen'; // New modern design
 import CourseEditScreen from './src/screens/CourseEditScreen';
 import ModuleEditScreen from './src/screens/ModuleEditScreen';
 import LessonEditScreen from './src/screens/LessonEditScreen';
 import EditPageScreen from './src/screens/PageEditScreen'; // Import EditPageScreen
+import ModernPageEditScreen from './src/screens/ModernPageEditScreen'; // Modern PageEdit design
 import GrainEditScreen from './src/screens/GrainEditScreen'; // Import GrainEditScreen
 import PageTestScreen from './src/screens/PageTestScreen'; // Import PageTestScreen
+import CourseBuilderScreen from './src/screens/CourseBuilderScreen'; // Import new CourseBuilderScreen
+import ModernCourseBuilderScreen from './src/screens/ModernCourseBuilderScreen'; // Modern CourseBuilder
+import ImprovedGrainEditorScreen from './src/screens/ImprovedGrainEditorScreen'; // Import improved grain editor
 import Auth from './src/components/Auth';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -21,11 +26,14 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 // Define the stack navigator types
 type RootStackParamList = {
   CourseList: undefined;
+  ModernCourseList: undefined; // New modern design
   CourseEdit: { courseId: string | null; refresh?: boolean };
+  CourseBuilder: { courseId: string; refresh?: boolean }; // New improved course builder
   ModuleEdit: { courseId: string; moduleId: string | null; refresh?: boolean };
   LessonEdit: { moduleId: string; lessonId: string | null; refresh?: boolean };
   PageEdit: { lessonId: string; pageId?: string | null; refresh?: boolean }; // Add PageEditScreen
   GrainEdit: { pageId: string; grainId?: string | null; position?: number; refresh?: boolean }; // Add GrainEditScreen
+  ImprovedGrainEdit: { pageId: string; grainId?: string | null; position?: number; expectedGrainType?: string; pageType?: string; refresh?: boolean }; // New improved grain editor
   PageTest: { pageId: string; pageTitle?: string }; // Add PageTestScreen for "Provar Página" feature
   ProfileEdit: undefined; // Add ProfileEditScreen to the list
 };
@@ -149,10 +157,18 @@ function MainContent() {
         >
           <Stack.Screen
             name="CourseList"
-            component={CourseListScreen}
+            component={ModernCourseListScreen}
             options={{
-              title: "Meus Cursos", // This title is overridden by the component's header
-              // headerRight is removed as Sign Out is now in TopBar
+              title: "Meus Cursos",
+              headerShown: false, // Hide header for modern design
+            }}
+          />
+          <Stack.Screen
+            name="ModernCourseList"
+            component={ModernCourseListScreen}
+            options={{
+              title: "Meus Cursos",
+              headerShown: false, // Hide header for modern design
             }}
           />
           <Stack.Screen
@@ -178,9 +194,10 @@ function MainContent() {
           />
           <Stack.Screen
             name="PageEdit"
-            component={EditPageScreen}
+            component={ModernPageEditScreen}
             options={({ route }) => ({
               title: route.params?.pageId ? "Editar Página" : "Criar Página",
+              headerShown: false, // Hide header for modern design
             })}
           />
           <Stack.Screen
@@ -194,6 +211,21 @@ function MainContent() {
             name="PageTest"
             component={PageTestScreen}
             options={{ title: "Provar Página" }}
+          />
+          <Stack.Screen
+            name="CourseBuilder"
+            component={ModernCourseBuilderScreen}
+            options={{ 
+              title: "Construtor de Curso",
+              headerShown: false, // Hide header for modern design
+            }}
+          />
+          <Stack.Screen
+            name="ImprovedGrainEdit"
+            component={ImprovedGrainEditorScreen}
+            options={({ route }) => ({
+              title: route.params?.grainId ? "Editar Exercício" : "Criar Exercício",
+            })}
           />
           <Stack.Screen
             name="ProfileEdit"

@@ -442,7 +442,7 @@ const EditPageScreen = () => {
     }
     const nextPosition = grains.length + 1;
     const expectedGrainType = getExpectedGrainType(nextPosition, pageType);
-    navigation.navigate('GrainEdit', { 
+    navigation.navigate('ImprovedGrainEdit', { 
       pageId, 
       grainId: null, 
       position: nextPosition, 
@@ -456,7 +456,7 @@ const EditPageScreen = () => {
     // Find the grain to get its position
     const grain = grains.find(g => g.id === grainId);
     const expectedGrainType = grain ? getExpectedGrainType(grain.position, pageType) : null;
-    navigation.navigate('GrainEdit', { 
+    navigation.navigate('ImprovedGrainEdit', { 
       pageId, 
       grainId, 
       expectedGrainType,

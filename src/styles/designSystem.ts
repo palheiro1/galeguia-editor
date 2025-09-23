@@ -4,26 +4,36 @@ import { Platform, Dimensions } from 'react-native';
 const { width: screenWidth } = Dimensions.get('window');
 
 export const COLORS = {
+  // Design System Colors (matching the modern HTML design)
+  bg: '#f6f7fb',
+  bg2: '#ffffff',
+  text: '#111827',
+  muted: '#6b7280',
+  line: '#e5e7eb',
+  
   // Primary colors
-  primary: '#6366f1',
+  primary: '#6366f1',    // indigo
+  primary2: '#3b82f6',   // blue  
   primaryLight: '#818cf8',
   primaryDark: '#4f46e5',
   
   // Secondary colors
-  secondary: '#06b6d4',
+  secondary: '#06b6d4',  // cyan (accent)
+  accent: '#06b6d4',     // alias for secondary
   secondaryLight: '#67e8f9',
   secondaryDark: '#0891b2',
   
   // Success, Warning, Error
-  success: '#10b981',
+  success: '#10b981',    // green
   successLight: '#6ee7b7',
   successDark: '#047857',
   
-  warning: '#f59e0b',
+  warning: '#f59e0b',    // amber
   warningLight: '#fbbf24',
   warningDark: '#d97706',
   
-  error: '#ef4444',
+  error: '#ef4444',      // red
+  danger: '#ef4444',     // alias for error
   errorLight: '#f87171',
   errorDark: '#dc2626',
   
@@ -58,15 +68,6 @@ export const COLORS = {
   textTertiary: '#94a3b8',
   border: '#e2e8f0',
   borderLight: '#f1f5f9',
-  
-  // Text color variants
-  text: {
-    primary: '#1e293b',
-    secondary: '#64748b',
-    tertiary: '#94a3b8',
-    inverse: '#ffffff',
-    disabled: '#94a3b8',
-  },
   
   // Status colors
   online: '#10b981',
@@ -176,10 +177,10 @@ export const BORDER_RADIUS = {
   none: 0,
   sm: 4,
   base: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  '2xl': 24,
+  md: 10,     // button radius
+  lg: 12,     // input radius  
+  xl: 14,     // main card radius (matching HTML design)
+  '2xl': 20,
   full: 9999,
 };
 
@@ -191,12 +192,13 @@ export const SHADOWS = {
     shadowRadius: 0,
     elevation: 0,
   },
+  // Modern shadow matching HTML design: 0 1px 2px rgba(0,0,0,.06), 0 12px 24px rgba(0,0,0,.06)
   sm: Platform.select({
     ios: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
     },
     android: {
       elevation: 2,

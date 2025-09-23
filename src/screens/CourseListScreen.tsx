@@ -301,7 +301,7 @@ export default function CourseListScreen({ navigation }: any) {
   };
 
   const createNewCourse = () => navigation.navigate('CourseEdit', { courseId: null });
-  const editCourse = (courseId: string) => navigation.navigate('CourseEdit', { courseId });
+  const editCourse = (courseId: string) => navigation.navigate('CourseBuilder', { courseId });
 
   const renderCourseItem = ({ item }: { item: Course }) => {
     const completion = item.completion;
