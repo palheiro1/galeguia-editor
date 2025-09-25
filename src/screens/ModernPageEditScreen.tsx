@@ -15,6 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '../styles/designSystem';
 import { useAuth } from '../contexts/AuthContext';
+import { useSidebar } from '../contexts/SidebarContext';
 import ModernSidebar from '../components/ModernSidebar';
 
 // Types

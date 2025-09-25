@@ -15,6 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../styles/designSystem';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useSidebar } from '../contexts/SidebarContext';
 import ModernSidebar from '../components/ModernSidebar';
 
 interface CourseStructure {

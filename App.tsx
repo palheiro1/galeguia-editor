@@ -20,6 +20,7 @@ import ModernCourseBuilderScreen from './src/screens/ModernCourseBuilderScreen';
 import ImprovedGrainEditorScreen from './src/screens/ImprovedGrainEditorScreen'; // Import improved grain editor
 import Auth from './src/components/Auth';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { SidebarProvider } from './src/contexts/SidebarContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 
@@ -245,7 +246,9 @@ export default function App() {
     <ErrorBoundary>
       <AuthRedirect>
         <AuthProvider>
-          <MainContent />
+          <SidebarProvider>
+            <MainContent />
+          </SidebarProvider>
         </AuthProvider>
       </AuthRedirect>
     </ErrorBoundary>

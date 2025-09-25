@@ -4,10 +4,13 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../styles/designSystem';
 import { useAuth } from '../contexts/AuthContext';
+import { useSidebar } from '../contexts/SidebarContext';
 
 interface ModernSidebarProps {
   currentRoute: string;
@@ -19,6 +22,15 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
   onNavigate,
 }) => {
   const { session } = useAuth();
+  const { isSidebarVisible, isMobile, closeSidebar } = useSidebar();
+  
+  const handleNavigate = (route: string) => {
+    onNavigate(route);
+    // Close sidebar on mobile after navigation
+    if (isMobile) {
+      closeSidebar();
+    }
+  };
 
   const navigationItems = [
     { key: 'CourseList', label: 'Cursos', icon: 'school' },
@@ -28,8 +40,11 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
     { key: 'Settings', label: 'Definições', icon: 'settings' },
   ];
 
-  return (
-    <View style={styles.sidebar}>
+  const sidebarContent = (
+    <View style={[
+      styles.sidebar,
+      isMobile && styles.sidebarMobile
+    ]}>
       <View>
         <View style={styles.brand}>
           <View style={styles.logo}>
@@ -49,7 +64,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
                 styles.navItem,
                 currentRoute === item.key && styles.navItemActive
               ]}
-              onPress={() => onNavigate(item.key)}
+              onPress={() => handleNavigate(item.key)}
             >
               <MaterialIcons 
                 name={item.icon as any} 
@@ -79,6 +94,32 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
       </View>
     </View>
   );
+
+  // Don't render anything if sidebar should be hidden
+  if (!isSidebarVisible) {
+    return null;
+  }
+
+  // On mobile, render as overlay modal
+  if (isMobile) {
+    return (
+      <Modal
+        visible={isSidebarVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeSidebar}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeSidebar}>
+          <Pressable style={{ flex: 1 }} onPress={(e) => e.stopPropagation()}>
+            {sidebarContent}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    );
+  }
+
+  // On desktop, render normally
+  return sidebarContent;
 };
 
 const styles = StyleSheet.create({
@@ -179,6 +220,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.text,
     textAlign: 'center',
+  },
+  sidebarMobile: {
+    position: 'absolute' as any,
+    top: 0,
+    left: 0,
+    height: '100vh' as any,
+    width: 280,
+    zIndex: 1000,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flexDirection: 'row',
   },
 });
 

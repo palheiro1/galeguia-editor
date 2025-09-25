@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../styles/designSystem';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useSidebar } from '../contexts/SidebarContext';
 import ModernSidebar from '../components/ModernSidebar';
 import ModernTopBar from '../components/ModernTopBar';
 import ModernCourseCard from '../components/ModernCourseCard';
@@ -37,7 +38,7 @@ interface Course {
 const ModernCourseListScreen: React.FC = () => {
   const navigation = useNavigation();
   const { session } = useAuth();
-  const { width } = useWindowDimensions();
+  const { isMobile } = useSidebar();
   
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,11 +46,7 @@ const ModernCourseListScreen: React.FC = () => {
   const [currentView, setCurrentView] = useState<'cards' | 'table'>('table');
   const [activeFilter, setActiveFilter] = useState<'all' | 'published' | 'draft' | 'mine'>('all');
   
-  // Hide sidebar on mobile devices (width < 768px)
-  const showSidebar = width >= 768;
-  
   // Use cards view on mobile for better UX
-  const isMobile = width < 768;
   const effectiveView = isMobile ? 'cards' : currentView;
 
   useEffect(() => {
@@ -223,12 +220,10 @@ const ModernCourseListScreen: React.FC = () => {
 
   return (
     <View style={styles.app}>
-      {showSidebar && (
-        <ModernSidebar
-          currentRoute="CourseList"
-          onNavigate={handleNavigate}
-        />
-      )}
+      <ModernSidebar
+        currentRoute="CourseList"
+        onNavigate={handleNavigate}
+      />
       
       <View style={styles.main}>
         <ModernTopBar

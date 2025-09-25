@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../styles/designSystem';
+import HamburgerButton from './HamburgerButton';
 
 interface ModernTopBarProps {
   onNewCourse: () => void;
@@ -29,15 +30,18 @@ const ModernTopBar: React.FC<ModernTopBarProps> = ({
   return (
     <View style={styles.topbar}>
       <View style={styles.topbarInner}>
-        <View style={styles.search}>
-          <MaterialIcons name="search" size={20} color={COLORS.muted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Pesquisar cursos por título, autor, estado…"
-            placeholderTextColor={COLORS.muted}
-            value={searchQuery}
-            onChangeText={onSearchChange}
-          />
+        <View style={styles.leftSection}>
+          <HamburgerButton />
+          <View style={styles.search}>
+            <MaterialIcons name="search" size={20} color={COLORS.muted} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Pesquisar cursos por título, autor, estado…"
+              placeholderTextColor={COLORS.muted}
+              value={searchQuery}
+              onChangeText={onSearchChange}
+            />
+          </View>
         </View>
         
         <View style={styles.toolbar}>
@@ -113,6 +117,11 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 12,
     paddingHorizontal: 16,
+  },
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   search: {
     flex: 1,
