@@ -15,6 +15,7 @@ interface ModernTopBarProps {
   currentView: 'cards' | 'table';
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  isMobile?: boolean;
 }
 
 const ModernTopBar: React.FC<ModernTopBarProps> = ({
@@ -23,6 +24,7 @@ const ModernTopBar: React.FC<ModernTopBarProps> = ({
   currentView,
   searchQuery,
   onSearchChange,
+  isMobile = false,
 }) => {
   return (
     <View style={styles.topbar}>
@@ -39,48 +41,56 @@ const ModernTopBar: React.FC<ModernTopBarProps> = ({
         </View>
         
         <View style={styles.toolbar}>
-          <View style={styles.segmentedControl}>
-            <TouchableOpacity 
-              style={[
-                styles.segButton, 
-                currentView === 'cards' && styles.segButtonActive
-              ]}
-              onPress={() => onToggleView('cards')}
-            >
-              <Text style={[
-                styles.segButtonText,
-                currentView === 'cards' && styles.segButtonTextActive
-              ]}>
-                Cartões
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[
-                styles.segButton, 
-                currentView === 'table' && styles.segButtonActive
-              ]}
-              onPress={() => onToggleView('table')}
-            >
-              <Text style={[
-                styles.segButtonText,
-                currentView === 'table' && styles.segButtonTextActive
-              ]}>
-                Tabela
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {!isMobile && (
+            <View style={styles.segmentedControl}>
+              <TouchableOpacity 
+                style={[
+                  styles.segButton, 
+                  currentView === 'cards' && styles.segButtonActive
+                ]}
+                onPress={() => onToggleView('cards')}
+              >
+                <Text style={[
+                  styles.segButtonText,
+                  currentView === 'cards' && styles.segButtonTextActive
+                ]}>
+                  Cartões
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[
+                  styles.segButton, 
+                  currentView === 'table' && styles.segButtonActive
+                ]}
+                onPress={() => onToggleView('table')}
+              >
+                <Text style={[
+                  styles.segButtonText,
+                  currentView === 'table' && styles.segButtonTextActive
+                ]}>
+                  Tabela
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
           
-          <TouchableOpacity style={styles.btn}>
-            <Text style={styles.btnText}>Estado ▾</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.btn}>
-            <Text style={styles.btnText}>Ordenar ▾</Text>
-          </TouchableOpacity>
+          {!isMobile && (
+            <>
+              <TouchableOpacity style={styles.btn}>
+                <Text style={styles.btnText}>Estado ▾</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.btn}>
+                <Text style={styles.btnText}>Ordenar ▾</Text>
+              </TouchableOpacity>
+            </>
+          )}
           
           <TouchableOpacity style={styles.btnPrimary} onPress={onNewCourse}>
             <MaterialIcons name="add" size={20} color="white" />
-            <Text style={styles.btnPrimaryText}>Novo Curso</Text>
+            <Text style={[styles.btnPrimaryText, isMobile && styles.btnPrimaryTextMobile]}>
+              {isMobile ? "Novo" : "Novo Curso"}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -179,6 +189,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '500',
+  },
+  btnPrimaryTextMobile: {
+    fontSize: 12,
   },
 });
 

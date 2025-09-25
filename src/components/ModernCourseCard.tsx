@@ -13,6 +13,9 @@ interface Course {
   id: string;
   title: string;
   description: string;
+  creator_id: string;
+  author_name?: string;
+  author_display_name?: string;
   author_email: string;
   published: boolean;
   cover_image_url?: string;
@@ -85,7 +88,7 @@ const ModernCourseCard: React.FC<ModernCourseCardProps> = ({
         <View style={styles.meta}>
           <MaterialIcons name="person" size={14} color={COLORS.muted} />
           <Text style={styles.metaText}>
-            {course.author_email} · {formatDate(course.created_at)}
+            {course.author_display_name} · {formatDate(course.created_at)}
           </Text>
         </View>
         

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../styles/designSystem';
@@ -21,6 +22,9 @@ interface Course {
   id: string;
   title: string;
   description: string;
+  creator_id: string;
+  author_name?: string;
+  author_display_name?: string;
   author_email: string;
   published: boolean;
   cover_image_url?: string;
@@ -33,11 +37,20 @@ interface Course {
 const ModernCourseListScreen: React.FC = () => {
   const navigation = useNavigation();
   const { session } = useAuth();
+  const { width } = useWindowDimensions();
+  
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentView, setCurrentView] = useState<'cards' | 'table'>('cards');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [currentView, setCurrentView] = useState<'cards' | 'table'>('table');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'published' | 'draft' | 'mine'>('all');
+  
+  // Hide sidebar on mobile devices (width < 768px)
+  const showSidebar = width >= 768;
+  
+  // Use cards view on mobile for better UX
+  const isMobile = width < 768;
+  const effectiveView = isMobile ? 'cards' : currentView;
 
   useEffect(() => {
     fetchCourses();
@@ -46,13 +59,28 @@ const ModernCourseListScreen: React.FC = () => {
   const fetchCourses = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      
+      // Get courses first
+      const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setCourses(data || []);
+      if (coursesError) throw coursesError;
+
+      // Get current user info for filtering
+      let currentUserEmail = session?.user?.email || '';
+
+      // Transform the data to include proper author information
+      const coursesWithAuthorInfo = (coursesData || []).map(course => ({
+        ...course,
+        // Use author_name from course if available, otherwise use a default
+        author_display_name: course.author_name || 'Unknown Author',
+        // Use creator_id to determine if it's the current user's course
+        author_email: course.creator_id === session?.user?.id ? currentUserEmail : 'other@user.com'
+      }));
+      
+      setCourses(coursesWithAuthorInfo);
     } catch (error) {
       console.error('Error fetching courses:', error);
       Alert.alert('Erro', 'Não foi possível carregar os cursos');
@@ -63,11 +91,13 @@ const ModernCourseListScreen: React.FC = () => {
 
   const filteredCourses = courses.filter(course => {
     const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         course.author_email.toLowerCase().includes(searchQuery.toLowerCase());
+                         (course.author_display_name && course.author_display_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         (course.author_name && course.author_name.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesFilter = activeFilter === 'all' || 
                          (activeFilter === 'published' && course.published) ||
-                         (activeFilter === 'draft' && !course.published);
+                         (activeFilter === 'draft' && !course.published) ||
+                         (activeFilter === 'mine' && course.creator_id === session?.user?.id);
     
     return matchesSearch && matchesFilter;
   });
@@ -98,6 +128,15 @@ const ModernCourseListScreen: React.FC = () => {
       >
         <Text style={[styles.chipText, activeFilter === 'all' && styles.chipTextActive]}>
           Todos
+        </Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={[styles.chip, activeFilter === 'mine' && styles.chipActive]}
+        onPress={() => setActiveFilter('mine')}
+      >
+        <Text style={[styles.chipText, activeFilter === 'mine' && styles.chipTextActive]}>
+          Só os meus Cursos
         </Text>
       </TouchableOpacity>
       
@@ -149,7 +188,7 @@ const ModernCourseListScreen: React.FC = () => {
       {filteredCourses.map((course) => (
         <View key={course.id} style={styles.tableRow}>
           <Text style={styles.tableCellTitle}>{course.title}</Text>
-          <Text style={styles.tableCell}>{course.author_email}</Text>
+          <Text style={styles.tableCell}>{course.author_display_name}</Text>
           <Text style={[
             styles.tableCell,
             course.published ? styles.tableCellPublished : styles.tableCellDraft
@@ -184,10 +223,12 @@ const ModernCourseListScreen: React.FC = () => {
 
   return (
     <View style={styles.app}>
-      <ModernSidebar
-        currentRoute="CourseList"
-        onNavigate={handleNavigate}
-      />
+      {showSidebar && (
+        <ModernSidebar
+          currentRoute="CourseList"
+          onNavigate={handleNavigate}
+        />
+      )}
       
       <View style={styles.main}>
         <ModernTopBar
@@ -196,17 +237,20 @@ const ModernCourseListScreen: React.FC = () => {
           currentView={currentView}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          isMobile={isMobile}
         />
         
         <ScrollView style={styles.content}>
-          <View style={styles.sectionHeader}>
+          <View style={[styles.sectionHeader, isMobile && styles.sectionHeaderMobile]}>
             {renderFilters()}
-            <Text style={styles.tipText}>
-              Dica: use ⌘/Ctrl+K para a paleta de comandos.
-            </Text>
+            {!isMobile && (
+              <Text style={styles.tipText}>
+                Dica: use ⌘/Ctrl+K para a paleta de comandos.
+              </Text>
+            )}
           </View>
           
-          {currentView === 'cards' ? renderCards() : renderTable()}
+          {effectiveView === 'cards' ? renderCards() : renderTable()}
         </ScrollView>
       </View>
     </View>
@@ -236,6 +280,12 @@ const styles = StyleSheet.create({
     margin: 6,
     marginVertical: 14,
     paddingHorizontal: 16,
+  },
+  sectionHeaderMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    gap: 12,
   },
   filters: {
     flexDirection: 'row',
