@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Pressable,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -24,6 +25,9 @@ interface CourseStructure {
   description?: string;
   cover_image_url?: string;
   published: boolean;
+  creator_id?: string | null;
+  author_name?: string | null;
+  author_display_name?: string | null;
   modules: ModuleStructure[];
 }
 
@@ -53,7 +57,7 @@ interface PageStructure {
 const ModernCourseBuilderScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const { courseId } = route.params as { courseId: string };
   
   const [courseStructure, setCourseStructure] = useState<CourseStructure | null>(null);
@@ -63,6 +67,23 @@ const ModernCourseBuilderScreen: React.FC = () => {
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'modules' | 'lessons'>('modules');
   const [editMode, setEditMode] = useState<'course' | 'module' | 'lesson' | 'page'>('course');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingModuleId, setDeletingModuleId] = useState<string | null>(null);
+  const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
+  const [deletingPageId, setDeletingPageId] = useState<string | null>(null);
+  const [creatingModule, setCreatingModule] = useState(false);
+  const [creatingLesson, setCreatingLesson] = useState(false);
+
+  const userId = session?.user?.id ?? null;
+  const userRole = profile?.role;
+
+  const canManageCourse = useMemo(() => {
+    if (!courseStructure) return false;
+
+    if (userRole === 'admin') return true;
+
+    return Boolean(userId && courseStructure.creator_id && courseStructure.creator_id === userId);
+  }, [courseStructure, userId, userRole]);
 
   useEffect(() => {
     fetchCourseStructure();
@@ -267,6 +288,373 @@ const ModernCourseBuilderScreen: React.FC = () => {
     (navigation as any).navigate('CourseList');
   };
 
+  const confirmDeleteCourse = async () => {
+    if (!courseStructure) return;
+
+    try {
+      setIsDeleting(true);
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseStructure.id);
+
+      if (error) throw error;
+
+      Alert.alert('Sucesso', 'Curso eliminado com sucesso.');
+      setCourseStructure(null);
+      handleBackToList();
+    } catch (error) {
+      console.error('Erro ao eliminar curso:', error);
+      Alert.alert('Erro', 'Não foi possível eliminar o curso.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCourse = () => {
+    if (!courseStructure) return;
+
+    if (!canManageCourse) {
+      Alert.alert('Sem permissão', 'Precisa de ser administrador ou autor do curso para o eliminar.');
+      return;
+    }
+
+    Alert.alert(
+      'Eliminar curso',
+      `Tem a certeza que deseja eliminar "${courseStructure.title}"? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: confirmDeleteCourse,
+        },
+      ]
+    );
+  };
+
+  const handleCreateModule = async () => {
+    if (!courseStructure) return;
+
+    if (!canManageCourse) {
+      Alert.alert('Sem permissão', 'Precisa de ser administrador ou autor do curso para criar módulos.');
+      return;
+    }
+
+    try {
+      setCreatingModule(true);
+      const nextPosition = courseStructure.modules.reduce((max, module) => Math.max(max, module.position ?? 0), 0) + 1;
+      console.log('Creating module for course', courseStructure.id, 'next position', nextPosition);
+
+      const { data, error } = await supabase
+        .from('modules')
+        .insert({
+          course_id: courseStructure.id,
+          title: `Novo módulo ${nextPosition}`,
+          position: nextPosition,
+        })
+        .select('id, title, position')
+        .single();
+
+      if (error) throw error;
+
+      const newModule: ModuleStructure = {
+        id: data.id,
+        title: data.title,
+        position: data.position ?? nextPosition,
+        lessons: [],
+      };
+
+      setCourseStructure(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          modules: [...prev.modules, newModule].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+        };
+      });
+
+      setSelectedModule(data.id);
+      setSelectedLesson(null);
+      setSelectedPage(null);
+      setEditMode('module');
+      setViewMode('modules');
+      Alert.alert('Sucesso', 'Módulo criado com sucesso.');
+    } catch (error) {
+      console.error('Erro ao criar módulo:', error);
+      Alert.alert('Erro', 'Não foi possível criar o módulo.');
+    } finally {
+      setCreatingModule(false);
+    }
+  };
+
+  const handleCreateLesson = async () => {
+    if (!selectedModule) {
+      Alert.alert('Seleção necessária', 'Selecione primeiro um módulo para criar uma lição.');
+      return;
+    }
+
+    if (!canManageCourse) {
+      Alert.alert('Sem permissão', 'Precisa de ser administrador ou autor do curso para criar lições.');
+      return;
+    }
+
+    const moduleData = getSelectedModule();
+    if (!moduleData) {
+      Alert.alert('Erro', 'Não foi possível encontrar o módulo selecionado.');
+      return;
+    }
+
+    try {
+      setCreatingLesson(true);
+      const nextPosition = moduleData.lessons.reduce((max, lesson) => Math.max(max, lesson.position ?? 0), 0) + 1;
+      console.log('Creating lesson for module', selectedModule, 'next position', nextPosition);
+
+      const { data, error } = await supabase
+        .from('lessons')
+        .insert({
+          module_id: selectedModule,
+          title: `Nova lição ${nextPosition}`,
+          position: nextPosition,
+        })
+        .select('id, title, position')
+        .single();
+
+      if (error) throw error;
+
+      const newLesson: LessonStructure = {
+        id: data.id,
+        title: data.title,
+        position: data.position ?? nextPosition,
+        pages: [],
+      };
+
+      setCourseStructure(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          modules: prev.modules.map(module =>
+            module.id === selectedModule
+              ? {
+                  ...module,
+                  lessons: [...module.lessons, newLesson].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+                }
+              : module
+          ),
+        };
+      });
+
+      setSelectedLesson(data.id);
+      setSelectedPage(null);
+      setEditMode('lesson');
+      setViewMode('lessons');
+      Alert.alert('Sucesso', 'Lição criada com sucesso.');
+    } catch (error) {
+      console.error('Erro ao criar lição:', error);
+      Alert.alert('Erro', 'Não foi possível criar a lição.');
+    } finally {
+      setCreatingLesson(false);
+    }
+  };
+
+  const confirmDeleteModule = async (moduleId: string) => {
+    try {
+      console.log('Deleting module', moduleId);
+      setDeletingModuleId(moduleId);
+      const { error } = await supabase
+        .from('modules')
+        .delete()
+        .eq('id', moduleId);
+
+      if (error) throw error;
+
+      setCourseStructure(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          modules: prev.modules.filter(module => module.id !== moduleId),
+        };
+      });
+
+      if (selectedModule === moduleId) {
+        setSelectedModule(null);
+        setSelectedLesson(null);
+        setSelectedPage(null);
+        setEditMode('course');
+      }
+
+      Alert.alert('Sucesso', 'Módulo eliminado com sucesso.');
+    } catch (error) {
+      console.error('Erro ao eliminar módulo:', error);
+      Alert.alert('Erro', 'Não foi possível eliminar o módulo.');
+    } finally {
+      setDeletingModuleId(null);
+    }
+  };
+
+  const handleDeleteModule = (module: ModuleStructure) => {
+    if (!canManageCourse) {
+      Alert.alert('Sem permissão', 'Precisa de ser administrador ou autor do curso para eliminar módulos.');
+      return;
+    }
+
+    const moduleTitle = module.title?.trim().length ? module.title : `Módulo ${module.position}`;
+
+    Alert.alert(
+      'Eliminar módulo',
+      `Tem a certeza que deseja eliminar "${moduleTitle}"? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => confirmDeleteModule(module.id),
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteLesson = async (lessonId: string, moduleId: string) => {
+    try {
+      console.log('Deleting lesson', lessonId);
+      setDeletingLessonId(lessonId);
+      const { error } = await supabase
+        .from('lessons')
+        .delete()
+        .eq('id', lessonId);
+
+      if (error) throw error;
+
+      setCourseStructure(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          modules: prev.modules.map(module =>
+            module.id === moduleId
+              ? {
+                  ...module,
+                  lessons: module.lessons.filter(lesson => lesson.id !== lessonId),
+                }
+              : module
+          ),
+        };
+      });
+
+      if (selectedLesson === lessonId) {
+        setSelectedLesson(null);
+        setSelectedPage(null);
+        setEditMode('module');
+      }
+
+      Alert.alert('Sucesso', 'Lição eliminada com sucesso.');
+    } catch (error) {
+      console.error('Erro ao eliminar lição:', error);
+      Alert.alert('Erro', 'Não foi possível eliminar a lição.');
+    } finally {
+      setDeletingLessonId(null);
+    }
+  };
+
+  const handleDeleteLesson = (lesson: LessonStructure, moduleId?: string) => {
+    if (!canManageCourse) {
+      Alert.alert('Sem permissão', 'Precisa de ser administrador ou autor do curso para eliminar lições.');
+      return;
+    }
+
+    if (!moduleId) {
+      Alert.alert('Erro', 'Módulo selecionado inválido.');
+      return;
+    }
+
+    const lessonTitle = lesson.title?.trim().length ? lesson.title : `Lição ${lesson.position}`;
+
+    Alert.alert(
+      'Eliminar lição',
+      `Tem a certeza que deseja eliminar "${lessonTitle}"? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => confirmDeleteLesson(lesson.id, moduleId),
+        },
+      ]
+    );
+  };
+
+  const confirmDeletePage = async (pageId: string, lessonId: string, moduleId: string) => {
+    try {
+      console.log('Deleting page', pageId);
+      setDeletingPageId(pageId);
+      const { error } = await supabase
+        .from('pages')
+        .delete()
+        .eq('id', pageId);
+
+      if (error) throw error;
+
+      setCourseStructure(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          modules: prev.modules.map(module =>
+            module.id === moduleId
+              ? {
+                  ...module,
+                  lessons: module.lessons.map(lesson =>
+                    lesson.id === lessonId
+                      ? {
+                          ...lesson,
+                          pages: lesson.pages.filter(page => page.id !== pageId),
+                        }
+                      : lesson
+                  ),
+                }
+              : module
+          ),
+        };
+      });
+
+      if (selectedPage === pageId) {
+        setSelectedPage(null);
+        setEditMode('lesson');
+      }
+
+      Alert.alert('Sucesso', 'Página eliminada com sucesso.');
+    } catch (error) {
+      console.error('Erro ao eliminar página:', error);
+      Alert.alert('Erro', 'Não foi possível eliminar a página.');
+    } finally {
+      setDeletingPageId(null);
+    }
+  };
+
+  const handleDeletePage = (page: PageStructure, moduleId?: string, lessonId?: string) => {
+    if (!canManageCourse) {
+      Alert.alert('Sem permissão', 'Precisa de ser administrador ou autor do curso para eliminar páginas.');
+      return;
+    }
+
+    if (!moduleId || !lessonId) {
+      Alert.alert('Erro', 'Contexto inválido para eliminar a página.');
+      return;
+    }
+
+    const pageTitle = page.title?.trim().length ? page.title : `Página ${page.position}`;
+
+    Alert.alert(
+      'Eliminar página',
+      `Tem a certeza que deseja eliminar "${pageTitle}"? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => confirmDeletePage(page.id, lessonId, moduleId),
+        },
+      ]
+    );
+  };
+
   const renderTopBar = () => (
     <View style={styles.topbar}>
       <View style={styles.topbarInner}>
@@ -282,7 +670,15 @@ const ModernCourseBuilderScreen: React.FC = () => {
           <TouchableOpacity style={styles.btn}>
             <Text style={styles.btnText}>Mover para rascunho</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.btnPrimary}>
+          <TouchableOpacity
+            style={[styles.btnDanger, (!canManageCourse || isDeleting) && styles.btnDisabled]}
+            onPress={handleDeleteCourse}
+            disabled={!canManageCourse || isDeleting}
+          >
+            <MaterialIcons name="delete-outline" size={16} color="white" />
+            <Text style={styles.btnDangerText}>{isDeleting ? 'A eliminar…' : 'Eliminar'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnPrimary} onPress={saveCourseChanges}>
             <MaterialIcons name="save" size={16} color="white" />
             <Text style={styles.btnPrimaryText}>Guardar</Text>
           </TouchableOpacity>
@@ -296,7 +692,7 @@ const ModernCourseBuilderScreen: React.FC = () => {
       <View style={styles.panelHead}>
         <Text style={styles.panelTitle}>Estrutura</Text>
         <View style={styles.segmentedControl}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.segButton, viewMode === 'modules' && styles.segButtonActive]}
             onPress={() => setViewMode('modules')}
           >
@@ -304,7 +700,7 @@ const ModernCourseBuilderScreen: React.FC = () => {
               Módulos
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.segButton, viewMode === 'lessons' && styles.segButtonActive]}
             onPress={() => setViewMode('lessons')}
           >
@@ -314,96 +710,141 @@ const ModernCourseBuilderScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
-      
+
       <ScrollView style={styles.outlineList}>
         {courseStructure?.modules.map((module) => (
           <View key={module.id}>
-            {/* Module Node */}
             <TouchableOpacity
-              style={[
-                styles.node,
-                selectedModule === module.id && styles.nodeSelected
-              ]}
+              style={[styles.node, selectedModule === module.id && styles.nodeSelected]}
               onPress={() => handleModuleSelect(module.id)}
             >
               <View style={styles.nodeHeader}>
-                <MaterialIcons 
-                  name={selectedModule === module.id ? "expand-less" : "expand-more"} 
-                  size={16} 
-                  color={COLORS.muted} 
+                <MaterialIcons
+                  name={selectedModule === module.id ? 'expand-less' : 'expand-more'}
+                  size={16}
+                  color={COLORS.muted}
                 />
                 <Text style={styles.nodeTitle} numberOfLines={1}>
                   {module.title || `Módulo ${module.position}`}
                 </Text>
               </View>
-              <View style={styles.nodeCount}>
-                <Text style={styles.nodeCountText}>
-                  {getModuleStats(module)}
-                </Text>
+              <View style={styles.nodeRight}>
+                <View style={styles.nodeCount}>
+                  <Text style={styles.nodeCountText}>{getModuleStats(module)}</Text>
+                </View>
+                {canManageCourse && (
+                  <Pressable
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      handleDeleteModule(module);
+                    }}
+                    style={({ pressed }) => [
+                      styles.nodeActionButton,
+                      deletingModuleId === module.id && styles.nodeActionDisabled,
+                      pressed && styles.nodeActionPressed,
+                    ]}
+                    disabled={deletingModuleId === module.id}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialIcons
+                      name={deletingModuleId === module.id ? 'hourglass-empty' : 'delete-outline'}
+                      size={16}
+                      color={deletingModuleId === module.id ? COLORS.muted : COLORS.danger}
+                    />
+                  </Pressable>
+                )}
               </View>
             </TouchableOpacity>
-            
-            {/* Lessons under selected module */}
+
             {selectedModule === module.id && (
               <View style={styles.subNodes}>
                 {module.lessons.map((lesson) => (
                   <View key={lesson.id}>
-                    {/* Lesson Node */}
                     <TouchableOpacity
-                      style={[
-                        styles.subNode,
-                        selectedLesson === lesson.id && styles.nodeSelected
-                      ]}
+                      style={[styles.subNode, selectedLesson === lesson.id && styles.nodeSelected]}
                       onPress={() => handleLessonSelect(lesson.id)}
                     >
                       <View style={styles.nodeHeader}>
-                        <MaterialIcons 
-                          name={selectedLesson === lesson.id ? "expand-less" : "expand-more"} 
-                          size={14} 
-                          color={COLORS.muted} 
+                        <MaterialIcons
+                          name={selectedLesson === lesson.id ? 'expand-less' : 'expand-more'}
+                          size={14}
+                          color={COLORS.muted}
                         />
                         <Text style={styles.subNodeTitle} numberOfLines={1}>
                           {lesson.title || `Lição ${lesson.position}`}
                         </Text>
                       </View>
-                      <View style={styles.nodeCount}>
-                        <Text style={styles.nodeCountText}>
-                          {lesson.pages.length}
-                        </Text>
+                      <View style={styles.subNodeRight}>
+                        <View style={styles.nodeCount}>
+                          <Text style={styles.nodeCountText}>{lesson.pages.length}</Text>
+                        </View>
+                        {canManageCourse && (
+                          <Pressable
+                            onPress={(event) => {
+                              event.stopPropagation();
+                              handleDeleteLesson(lesson, module.id);
+                            }}
+                            style={({ pressed }) => [
+                              styles.nodeActionButton,
+                              deletingLessonId === lesson.id && styles.nodeActionDisabled,
+                              pressed && styles.nodeActionPressed,
+                            ]}
+                            disabled={deletingLessonId === lesson.id}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <MaterialIcons
+                              name={deletingLessonId === lesson.id ? 'hourglass-empty' : 'delete-outline'}
+                              size={14}
+                              color={deletingLessonId === lesson.id ? COLORS.muted : COLORS.danger}
+                            />
+                          </Pressable>
+                        )}
                       </View>
                     </TouchableOpacity>
-                    
-                    {/* Pages under selected lesson */}
+
                     {selectedLesson === lesson.id && (
                       <View style={styles.subSubNodes}>
                         {lesson.pages.map((page) => (
                           <TouchableOpacity
                             key={page.id}
-                            style={[
-                              styles.subSubNode,
-                              selectedPage === page.id && styles.nodeSelected
-                            ]}
+                            style={[styles.subSubNode, selectedPage === page.id && styles.nodeSelected]}
                             onPress={() => handlePageSelect(page.id)}
                           >
                             <View style={styles.nodeHeader}>
-                              <MaterialIcons 
-                                name="description" 
-                                size={12} 
-                                color={COLORS.muted} 
-                              />
+                              <MaterialIcons name="description" size={12} color={COLORS.muted} />
                               <Text style={styles.subSubNodeTitle} numberOfLines={1}>
                                 {page.title || `Página ${page.position}`}
                               </Text>
                             </View>
-                            <View style={styles.pageTypeChip}>
-                              <Text style={styles.pageTypeText}>
-                                {page.type}
-                              </Text>
+                            <View style={styles.subSubNodeRight}>
+                              <View style={styles.pageTypeChip}>
+                                <Text style={styles.pageTypeText}>{page.type}</Text>
+                              </View>
+                              {canManageCourse && (
+                                <Pressable
+                                  onPress={(event) => {
+                                    event.stopPropagation();
+                                    handleDeletePage(page, module.id, lesson.id);
+                                  }}
+                                  style={({ pressed }) => [
+                                    styles.nodeActionButton,
+                                    deletingPageId === page.id && styles.nodeActionDisabled,
+                                    pressed && styles.nodeActionPressed,
+                                  ]}
+                                  disabled={deletingPageId === page.id}
+                                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                  <MaterialIcons
+                                    name={deletingPageId === page.id ? 'hourglass-empty' : 'delete-outline'}
+                                    size={12}
+                                    color={deletingPageId === page.id ? COLORS.muted : COLORS.danger}
+                                  />
+                                </Pressable>
+                              )}
                             </View>
                           </TouchableOpacity>
                         ))}
-                        
-                        {/* Add Page Button */}
+
                         <TouchableOpacity
                           style={styles.addPageButton}
                           onPress={() => handleCreatePage(lesson.id)}
@@ -420,15 +861,58 @@ const ModernCourseBuilderScreen: React.FC = () => {
           </View>
         ))}
       </ScrollView>
-      
+
       <View style={styles.panelFoot}>
-        <TouchableOpacity style={styles.addButton}>
-          <MaterialIcons name="add" size={16} color={COLORS.primary} />
-          <Text style={styles.addButtonText}>Módulo</Text>
+        <TouchableOpacity
+          style={[
+            styles.addButton,
+            (!canManageCourse || creatingModule) && styles.addButtonDisabled,
+          ]}
+          onPress={handleCreateModule}
+          disabled={!canManageCourse || creatingModule}
+        >
+          <MaterialIcons
+            name={creatingModule ? 'hourglass-empty' : 'add'}
+            size={16}
+            color={creatingModule ? COLORS.muted : COLORS.primary}
+          />
+          <Text
+            style={[
+              styles.addButtonText,
+              creatingModule && styles.addButtonTextDisabled,
+            ]}
+          >
+            {creatingModule ? 'A criar…' : 'Módulo'}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.addButton}>
-          <MaterialIcons name="add" size={16} color={COLORS.primary} />
-          <Text style={styles.addButtonText}>Lição</Text>
+        <TouchableOpacity
+          style={[
+            styles.addButton,
+            (!canManageCourse || creatingLesson) && styles.addButtonDisabled,
+            !selectedModule && styles.addButtonDisabled,
+          ]}
+          onPress={handleCreateLesson}
+          disabled={!canManageCourse || creatingLesson}
+        >
+          <MaterialIcons
+            name={creatingLesson ? 'hourglass-empty' : 'add'}
+            size={16}
+            color={
+              creatingLesson
+                ? COLORS.muted
+                : !selectedModule
+                ? COLORS.muted
+                : COLORS.primary
+            }
+          />
+          <Text
+            style={[
+              styles.addButtonText,
+              (creatingLesson || !selectedModule) && styles.addButtonTextDisabled,
+            ]}
+          >
+            {creatingLesson ? 'A criar…' : 'Lição'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -533,10 +1017,24 @@ const ModernCourseBuilderScreen: React.FC = () => {
                     placeholder="Digite o título do módulo"
                   />
                 </View>
-                <TouchableOpacity style={styles.btnPrimary} onPress={saveModuleChanges}>
-                  <MaterialIcons name="save" size={16} color="white" />
-                  <Text style={styles.btnPrimaryText}>Guardar Módulo</Text>
-                </TouchableOpacity>
+                <View style={styles.buttonGroup}>
+                  <TouchableOpacity style={styles.btnPrimary} onPress={saveModuleChanges}>
+                    <MaterialIcons name="save" size={16} color="white" />
+                    <Text style={styles.btnPrimaryText}>Guardar Módulo</Text>
+                  </TouchableOpacity>
+                  {canManageCourse && (
+                    <TouchableOpacity
+                      style={[styles.btnDanger, deletingModuleId === selectedModuleData.id && styles.btnDisabled]}
+                      onPress={() => handleDeleteModule(selectedModuleData)}
+                      disabled={deletingModuleId === selectedModuleData.id}
+                    >
+                      <MaterialIcons name="delete-outline" size={16} color="white" />
+                      <Text style={styles.btnDangerText}>
+                        {deletingModuleId === selectedModuleData.id ? 'A eliminar…' : 'Eliminar'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               {/* Module Stats */}
@@ -589,10 +1087,24 @@ const ModernCourseBuilderScreen: React.FC = () => {
                     placeholder="Digite o título da lição"
                   />
                 </View>
-                <TouchableOpacity style={styles.btnPrimary} onPress={saveLessonChanges}>
-                  <MaterialIcons name="save" size={16} color="white" />
-                  <Text style={styles.btnPrimaryText}>Guardar Lição</Text>
-                </TouchableOpacity>
+                <View style={styles.buttonGroup}>
+                  <TouchableOpacity style={styles.btnPrimary} onPress={saveLessonChanges}>
+                    <MaterialIcons name="save" size={16} color="white" />
+                    <Text style={styles.btnPrimaryText}>Guardar Lição</Text>
+                  </TouchableOpacity>
+                  {canManageCourse && selectedModuleData && (
+                    <TouchableOpacity
+                      style={[styles.btnDanger, deletingLessonId === selectedLessonData.id && styles.btnDisabled]}
+                      onPress={() => handleDeleteLesson(selectedLessonData, selectedModuleData.id)}
+                      disabled={deletingLessonId === selectedLessonData.id}
+                    >
+                      <MaterialIcons name="delete-outline" size={16} color="white" />
+                      <Text style={styles.btnDangerText}>
+                        {deletingLessonId === selectedLessonData.id ? 'A eliminar…' : 'Eliminar'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               {/* Pages in Lesson */}
@@ -644,13 +1156,27 @@ const ModernCourseBuilderScreen: React.FC = () => {
                     placeholder="Digite o título da página"
                   />
                 </View>
-                <TouchableOpacity 
-                  style={styles.btnPrimary}
-                  onPress={() => handleNavigateToPageEdit(selectedPageData.id)}
-                >
-                  <MaterialIcons name="edit" size={16} color="white" />
-                  <Text style={styles.btnPrimaryText}>Editar Página</Text>
-                </TouchableOpacity>
+                <View style={styles.buttonGroup}>
+                  <TouchableOpacity 
+                    style={styles.btnPrimary}
+                    onPress={() => handleNavigateToPageEdit(selectedPageData.id)}
+                  >
+                    <MaterialIcons name="edit" size={16} color="white" />
+                    <Text style={styles.btnPrimaryText}>Editar Página</Text>
+                  </TouchableOpacity>
+                  {canManageCourse && selectedModuleData && selectedLessonData && (
+                    <TouchableOpacity
+                      style={[styles.btnDanger, deletingPageId === selectedPageData.id && styles.btnDisabled]}
+                      onPress={() => handleDeletePage(selectedPageData, selectedModuleData.id, selectedLessonData.id)}
+                      disabled={deletingPageId === selectedPageData.id}
+                    >
+                      <MaterialIcons name="delete-outline" size={16} color="white" />
+                      <Text style={styles.btnDangerText}>
+                        {deletingPageId === selectedPageData.id ? 'A eliminar…' : 'Eliminar'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               {/* Page Info */}
@@ -804,6 +1330,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  buttonGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   btn: {
     borderWidth: 1,
     borderColor: COLORS.line,
@@ -833,6 +1364,23 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '500',
+  },
+  btnDanger: {
+    backgroundColor: COLORS.danger,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: BORDER_RADIUS.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  btnDangerText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  btnDisabled: {
+    opacity: 0.6,
   },
   content: {
     flex: 1,
@@ -905,6 +1453,11 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: BORDER_RADIUS.md,
   },
+  nodeRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   nodeSelected: {
     backgroundColor: 'rgba(99, 102, 241, 0.06)',
   },
@@ -946,6 +1499,11 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     marginVertical: 2,
   },
+  subNodeRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   subNodeTitle: {
     flex: 1,
     fontSize: 13,
@@ -967,11 +1525,29 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.sm,
     marginVertical: 1,
   },
+  subSubNodeRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   subSubNodeTitle: {
     flex: 1,
     fontSize: 12,
     fontWeight: '400',
     color: COLORS.text,
+  },
+  nodeActionButton: {
+    padding: 4,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nodeActionDisabled: {
+    opacity: 0.5,
+  },
+  nodeActionPressed: {
+    opacity: 0.7,
   },
   pageTypeChip: {
     paddingHorizontal: 6,
@@ -1021,10 +1597,16 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     backgroundColor: COLORS.bg,
   },
+  addButtonDisabled: {
+    opacity: 0.6,
+  },
   addButtonText: {
     color: COLORS.primary,
     fontSize: 12,
     fontWeight: '500',
+  },
+  addButtonTextDisabled: {
+    color: COLORS.muted,
   },
   editor: {
     padding: 16,

@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../styles/designSystem';
@@ -26,18 +26,19 @@ interface Course {
   creator_id: string;
   author_name?: string;
   author_display_name?: string;
-  author_email: string;
+  author_email?: string;
   published: boolean;
   cover_image_url?: string;
   created_at: string;
   modules_count?: number;
   pages_count?: number;
   progress?: number;
+  canManage?: boolean;
 }
 
 const ModernCourseListScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const { isMobile } = useSidebar();
   
   const [courses, setCourses] = useState<Course[]>([]);
@@ -45,13 +46,15 @@ const ModernCourseListScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentView, setCurrentView] = useState<'cards' | 'table'>('table');
   const [activeFilter, setActiveFilter] = useState<'all' | 'published' | 'draft' | 'mine'>('all');
+  const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
   
   // Use cards view on mobile for better UX
   const effectiveView = isMobile ? 'cards' : currentView;
 
   useEffect(() => {
+    if (!session) return;
     fetchCourses();
-  }, []);
+  }, [session?.user?.id, profile?.role]);
 
   const fetchCourses = async () => {
     try {
@@ -69,13 +72,19 @@ const ModernCourseListScreen: React.FC = () => {
       let currentUserEmail = session?.user?.email || '';
 
       // Transform the data to include proper author information
-      const coursesWithAuthorInfo = (coursesData || []).map(course => ({
-        ...course,
-        // Use author_name from course if available, otherwise use a default
-        author_display_name: course.author_name || 'Unknown Author',
-        // Use creator_id to determine if it's the current user's course
-        author_email: course.creator_id === session?.user?.id ? currentUserEmail : 'other@user.com'
-      }));
+      const coursesWithAuthorInfo: Course[] = (coursesData || []).map((course: any) => {
+        const canManageCourse = Boolean(
+          (session?.user?.id && course.creator_id === session.user.id) ||
+          profile?.role === 'admin'
+        );
+
+        return {
+          ...course,
+          author_display_name: course.author_name || 'Autor desconhecido',
+          author_email: course.creator_id === session?.user?.id ? currentUserEmail : '',
+          canManage: canManageCourse,
+        };
+      });
       
       setCourses(coursesWithAuthorInfo);
     } catch (error) {
@@ -110,6 +119,60 @@ const ModernCourseListScreen: React.FC = () => {
   const handleViewCourse = (courseId: string) => {
     // For now, same as edit - could be preview in the future
     (navigation as any).navigate('CourseBuilder', { courseId });
+  };
+
+  const confirmDeleteCourse = async (courseId: string) => {
+    try {
+      console.log('Deleting course', courseId);
+      setDeletingCourseId(courseId);
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId);
+
+      if (error) {
+        console.error('Erro ao eliminar curso:', error);
+        Alert.alert('Erro', 'Não foi possível eliminar o curso.');
+        return;
+      }
+
+      setCourses(prev => prev.filter(course => course.id !== courseId));
+      Alert.alert('Sucesso', 'Curso eliminado com sucesso.');
+    } catch (err) {
+      console.error('Erro inesperado ao eliminar curso:', err);
+      Alert.alert('Erro', 'Ocorreu um erro inesperado.');
+    } finally {
+      setDeletingCourseId(null);
+    }
+  };
+
+  const handleDeleteCourse = (course: Course) => {
+    if (!course.canManage) {
+      Alert.alert('Sem permissão', 'Precisa de ser administrador ou autor do curso para o eliminar.');
+      return;
+    }
+
+    const confirmMessage = `Tem a certeza que deseja eliminar "${course.title}"? Esta ação não pode ser desfeita.`;
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(confirmMessage)) {
+        confirmDeleteCourse(course.id);
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Eliminar curso',
+      confirmMessage,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => confirmDeleteCourse(course.id),
+        },
+      ]
+    );
   };
 
   const handleNavigate = (route: string) => {
@@ -165,6 +228,8 @@ const ModernCourseListScreen: React.FC = () => {
             course={course}
             onEdit={handleEditCourse}
             onView={handleViewCourse}
+            onDelete={() => handleDeleteCourse(course)}
+            isDeleting={deletingCourseId === course.id}
           />
         </View>
       ))}
@@ -179,7 +244,7 @@ const ModernCourseListScreen: React.FC = () => {
         <Text style={styles.tableHeaderText}>Estado</Text>
         <Text style={styles.tableHeaderText}>Data</Text>
         <Text style={styles.tableHeaderText}>Progresso</Text>
-        <Text style={styles.tableHeaderText}></Text>
+        <Text style={styles.tableHeaderText}>Ações</Text>
       </View>
       
       {filteredCourses.map((course) => (
@@ -198,12 +263,25 @@ const ModernCourseListScreen: React.FC = () => {
           <Text style={styles.tableCell}>
             {course.progress ? `${course.progress}%` : '—'}
           </Text>
-          <TouchableOpacity
-            style={styles.tableButton}
-            onPress={() => handleEditCourse(course.id)}
-          >
-            <Text style={styles.tableButtonText}>Editar</Text>
-          </TouchableOpacity>
+          <View style={styles.tableActions}>
+            <TouchableOpacity
+              style={styles.tableButton}
+              onPress={() => handleEditCourse(course.id)}
+            >
+              <Text style={styles.tableButtonText}>Editar</Text>
+            </TouchableOpacity>
+            {course.canManage && (
+              <TouchableOpacity
+                style={[styles.tableButton, styles.tableButtonDanger, deletingCourseId === course.id && styles.tableButtonDisabled]}
+                onPress={() => handleDeleteCourse(course)}
+                disabled={deletingCourseId === course.id}
+              >
+                <Text style={[styles.tableButtonText, styles.tableButtonTextDanger]}>
+                  {deletingCourseId === course.id ? 'A eliminar…' : 'Eliminar'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       ))}
     </View>
@@ -383,16 +461,30 @@ const styles = StyleSheet.create({
   tableCellDraft: {
     color: COLORS.warning,
   },
+  tableActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   tableButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: BORDER_RADIUS.md,
   },
+  tableButtonDanger: {
+    backgroundColor: COLORS.error,
+  },
+  tableButtonDisabled: {
+    opacity: 0.6,
+  },
   tableButtonText: {
     color: 'white',
     fontSize: 12,
     fontWeight: '500',
+  },
+  tableButtonTextDanger: {
+    color: 'white',
   },
   loadingContainer: {
     flex: 1,

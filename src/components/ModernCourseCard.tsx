@@ -16,25 +16,30 @@ interface Course {
   creator_id: string;
   author_name?: string;
   author_display_name?: string;
-  author_email: string;
+  author_email?: string;
   published: boolean;
   cover_image_url?: string;
   created_at: string;
   modules_count?: number;
   pages_count?: number;
   progress?: number;
+  canManage?: boolean;
 }
 
 interface ModernCourseCardProps {
   course: Course;
   onEdit: (courseId: string) => void;
   onView: (courseId: string) => void;
+  onDelete?: (courseId: string) => void;
+  isDeleting?: boolean;
 }
 
 const ModernCourseCard: React.FC<ModernCourseCardProps> = ({
   course,
   onEdit,
   onView,
+  onDelete,
+  isDeleting,
 }) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-PT', {
@@ -128,6 +133,16 @@ const ModernCourseCard: React.FC<ModernCourseCardProps> = ({
           >
             <MaterialIcons name="visibility" size={18} color="white" />
           </TouchableOpacity>
+
+          {course.canManage && onDelete && (
+            <TouchableOpacity
+              style={[styles.iconButton, styles.deleteButton, isDeleting && styles.iconButtonDisabled]}
+              onPress={() => onDelete(course.id)}
+              disabled={isDeleting}
+            >
+              <MaterialIcons name="delete" size={18} color="white" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -152,6 +167,12 @@ const styles = StyleSheet.create({
   coverImage: {
     width: '100%',
     height: '100%',
+  },
+  deleteButton: {
+    backgroundColor: COLORS.error,
+  },
+  iconButtonDisabled: {
+    opacity: 0.6,
   },
   coverGradient: {
     width: '100%',
