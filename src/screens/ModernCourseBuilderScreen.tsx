@@ -10,6 +10,7 @@ import {
   Alert,
   Dimensions,
   Pressable,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -115,6 +116,41 @@ const ModernCourseBuilderScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const confirmDestructiveAction = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    confirmLabel = 'Eliminar'
+  ) => {
+    if (Platform.OS === 'web') {
+      const prompt = `${title}\n\n${message}`;
+      const confirmed =
+        typeof window !== 'undefined' && typeof window.confirm === 'function'
+          ? window.confirm(prompt)
+          : typeof globalThis !== 'undefined' && typeof (globalThis as any).confirm === 'function'
+            ? (globalThis as any).confirm(prompt)
+            : false;
+
+      if (confirmed) {
+        onConfirm();
+      }
+      return;
+    }
+
+    Alert.alert(
+      title,
+      message,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: confirmLabel,
+          style: 'destructive',
+          onPress: onConfirm,
+        },
+      ]
+    );
   };
 
   const updateCourseTitle = (newTitle: string) => {
@@ -319,17 +355,10 @@ const ModernCourseBuilderScreen: React.FC = () => {
       return;
     }
 
-    Alert.alert(
+    confirmDestructiveAction(
       'Eliminar curso',
       `Tem a certeza que deseja eliminar "${courseStructure.title}"? Esta ação não pode ser desfeita.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: confirmDeleteCourse,
-        },
-      ]
+      confirmDeleteCourse
     );
   };
 
@@ -499,17 +528,10 @@ const ModernCourseBuilderScreen: React.FC = () => {
 
     const moduleTitle = module.title?.trim().length ? module.title : `Módulo ${module.position}`;
 
-    Alert.alert(
+    confirmDestructiveAction(
       'Eliminar módulo',
       `Tem a certeza que deseja eliminar "${moduleTitle}"? Esta ação não pode ser desfeita.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => confirmDeleteModule(module.id),
-        },
-      ]
+      () => confirmDeleteModule(module.id)
     );
   };
 
@@ -567,17 +589,10 @@ const ModernCourseBuilderScreen: React.FC = () => {
 
     const lessonTitle = lesson.title?.trim().length ? lesson.title : `Lição ${lesson.position}`;
 
-    Alert.alert(
+    confirmDestructiveAction(
       'Eliminar lição',
       `Tem a certeza que deseja eliminar "${lessonTitle}"? Esta ação não pode ser desfeita.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => confirmDeleteLesson(lesson.id, moduleId),
-        },
-      ]
+      () => confirmDeleteLesson(lesson.id, moduleId)
     );
   };
 
@@ -641,17 +656,10 @@ const ModernCourseBuilderScreen: React.FC = () => {
 
     const pageTitle = page.title?.trim().length ? page.title : `Página ${page.position}`;
 
-    Alert.alert(
+    confirmDestructiveAction(
       'Eliminar página',
       `Tem a certeza que deseja eliminar "${pageTitle}"? Esta ação não pode ser desfeita.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => confirmDeletePage(page.id, lessonId, moduleId),
-        },
-      ]
+      () => confirmDeletePage(page.id, lessonId, moduleId)
     );
   };
 
